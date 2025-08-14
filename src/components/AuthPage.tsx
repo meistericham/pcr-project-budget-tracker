@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import EnvWarning from './EnvWarning';
 
 const AuthPage: React.FC = () => {
   const { login } = useAuth();
@@ -44,13 +45,16 @@ const AuthPage: React.FC = () => {
     }
     try {
       setIsSendingReset(true);
+      const redirectTo = window.location.hostname === 'localhost'
+        ? 'http://localhost:5173/update-password'
+        : 'https://pcrtracker.meistericham.com/update-password';
       const { error: resetErrorResp } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: 'https://pcrtracker.meistericham.com/update-password'
+        redirectTo
       });
       if (resetErrorResp) {
         setResetError(resetErrorResp.message);
       } else {
-        setResetInfo('If an account exists for that email, a reset link has been sent.');
+        setResetInfo('Check your email for the reset link.');
       }
     } catch (e) {
       setResetError(e instanceof Error ? e.message : 'Failed to initiate password reset');
@@ -61,7 +65,14 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+      {/* AppBootOK Indicator */}
+      <div className="fixed top-2 left-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded text-xs font-mono">
+        AppBootOK
+      </div>
+      
       <div className="w-full max-w-md">
+        {/* Environment Warning */}
+        {!isSupabaseConfigured && <EnvWarning />}
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">

@@ -73,6 +73,7 @@ const AuthenticatedApp = () => {
 };
 
 function App() {
+  // Simple routing for /update-password
   if (typeof window !== 'undefined' && window.location.pathname === '/update-password') {
     return (
       <ErrorBoundary>
