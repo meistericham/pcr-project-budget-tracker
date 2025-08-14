@@ -11,6 +11,7 @@ import BudgetCodesView from './components/BudgetCodesView';
 import SettingsView from './components/SettingsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import UpdatePassword from './pages/UpdatePassword';
+import UsersAdmin from './pages/UsersAdmin';
 
 const AppContent = () => {
   const { currentView } = useApp();
@@ -73,15 +74,31 @@ const AuthenticatedApp = () => {
 };
 
 function App() {
-  // Simple routing for /update-password
-  if (typeof window !== 'undefined' && window.location.pathname === '/update-password') {
-    return (
-      <ErrorBoundary>
-        <ThemeProvider>
-          <UpdatePassword />
-        </ThemeProvider>
-      </ErrorBoundary>
-    );
+  // Simple routing for special pages
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname;
+    
+    if (pathname === '/update-password') {
+      return (
+        <ErrorBoundary>
+          <ThemeProvider>
+            <UpdatePassword />
+          </ThemeProvider>
+        </ErrorBoundary>
+      );
+    }
+    
+    if (pathname === '/admin/users') {
+      return (
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <UsersAdmin />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      );
+    }
   }
 
   return (
