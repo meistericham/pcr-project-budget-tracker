@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 
 export default function UpdatePassword() {
   const [status, setStatus] = useState<'checking'|'ready'|'saving'|'done'|'error'>('checking')

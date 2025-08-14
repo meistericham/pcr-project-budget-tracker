@@ -24,10 +24,11 @@
 
 ## Files Changed
 
-### 1. `src/lib/supabaseClient.ts`
-- **Change**: Replaced hard crash with graceful fallback
-- **Before**: Threw error when env vars missing
-- **After**: Uses demo values with warning message, exports `isSupabaseConfigured` flag
+### 1. `src/lib/supabase.ts` (Consolidated Singleton)
+- **Change**: Consolidated duplicate Supabase clients into single singleton with unique storage key
+- **Before**: Had two separate client files (`supabase.ts` and `supabaseClient.ts`) causing "Multiple GoTrueClient instances" warning
+- **After**: Single client instance with `storageKey: 'pcr-tracker-auth'` and graceful fallback for missing env vars
+- **Removed**: `src/lib/supabaseClient.ts` (duplicate file)
 
 ### 2. `.env.development` (new file)
 - **Purpose**: Provides safe demo environment variables for local development
@@ -37,10 +38,10 @@
 - **Purpose**: Shows user-friendly warning when Supabase isn't properly configured
 - **Styling**: Yellow warning banner with setup instructions
 
-### 4. `src/components/AuthPage.tsx`
+### 4. `src/components/AuthPage.tsx` & `src/pages/UpdatePassword.tsx`
 - **Added**: "AppBootOK" indicator (top-left corner)
 - **Added**: Environment warning display when `!isSupabaseConfigured`
-- **Import**: Added `isSupabaseConfigured` from supabaseClient
+- **Updated**: All imports changed from `../lib/supabaseClient` to `../lib/supabase` (consolidated client)
 
 ## How to Run Locally
 

@@ -1,15 +1,27 @@
+// NOTE FOR DEPLOY:
+// - In Supabase → Auth → URL Configuration: set Site URL = https://pcrtracker.meistericham.com and allow-list https://pcrtracker.meistericham.com/update-password.
+// - In Coolify: mark VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY as "Build Variable", then Redeploy (not Restart).
+
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key';
+// Environment variables
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-// Create Supabase client with enhanced options
+console.log('[ENV] VITE_SUPABASE_URL =', url);
+console.log('[ENV] VITE_SUPABASE_ANON_KEY =', anon ? '[present]' : undefined);
+
+// Create client with fallback values to prevent app crash during development
+const supabaseUrl = url || 'https://demo.supabase.co';
+const supabaseKey = anon || 'demo-key';
+
+// Singleton Supabase client with unique storage key to prevent multiple instances
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    storageKey: 'pcr-tracker-auth', // Unique storage key to avoid collisions
   },
   realtime: {
     params: {
@@ -18,23 +30,18 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   }
 });
 
-// Helper function to check if Supabase is properly configured
-export const isSupabaseConfigured = (): boolean => {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  return !!(url && key && 
-    url !== 'https://your-project.supabase.co' && 
-    url !== 'https://demo.supabase.co' &&
-    key !== 'your-anon-key' &&
-    key !== 'demo-key'
-  );
-};
+// Export environment validation status
+export const isSupabaseConfigured = !!(url && anon && url !== 'https://demo.supabase.co' && anon !== 'demo-key');
+
+// Log configuration status
+if (!isSupabaseConfigured) {
+  console.warn('[SUPABASE] Using demo configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.development for real functionality.');
+}
 
 // Helper function to test database connection
 export const testSupabaseConnection = async (): Promise<boolean> => {
   try {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured) {
       console.warn('Supabase not configured properly');
       return false;
     }
