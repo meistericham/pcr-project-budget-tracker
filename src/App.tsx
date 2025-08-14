@@ -1,4 +1,3 @@
-import React from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AppProvider, useApp } from './contexts/AppContext';
@@ -11,6 +10,7 @@ import UsersView from './components/UsersView';
 import BudgetCodesView from './components/BudgetCodesView';
 import SettingsView from './components/SettingsView';
 import ErrorBoundary from './components/ErrorBoundary';
+import UpdatePassword from './pages/UpdatePassword';
 
 const AppContent = () => {
   const { currentView } = useApp();
@@ -73,6 +73,16 @@ const AuthenticatedApp = () => {
 };
 
 function App() {
+  if (typeof window !== 'undefined' && window.location.pathname === '/update-password') {
+    return (
+      <ErrorBoundary>
+        <ThemeProvider>
+          <UpdatePassword />
+        </ThemeProvider>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <ThemeProvider>

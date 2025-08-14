@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 const AuthPage: React.FC = () => {
   const { login } = useAuth();
@@ -13,6 +14,9 @@ const AuthPage: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetInfo, setResetInfo] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +34,30 @@ const AuthPage: React.FC = () => {
 
   const getLockoutMessage = () => null;
   const getAttemptsWarning = () => null;
+
+  const handleForgotPassword = async () => {
+    setResetInfo(null);
+    setResetError(null);
+    if (!formData.email) {
+      setResetError('Please enter your email first.');
+      return;
+    }
+    try {
+      setIsSendingReset(true);
+      const { error: resetErrorResp } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: 'https://pcrtracker.meistericham.com/update-password'
+      });
+      if (resetErrorResp) {
+        setResetError(resetErrorResp.message);
+      } else {
+        setResetInfo('If an account exists for that email, a reset link has been sent.');
+      }
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : 'Failed to initiate password reset');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
@@ -101,6 +129,18 @@ const AuthPage: React.FC = () => {
               </div>
             )}
 
+            {resetError && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400">{resetError}</p>
+              </div>
+            )}
+
+            {resetInfo && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300">{resetInfo}</p>
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -116,6 +156,17 @@ const AuthPage: React.FC = () => {
                 </>
               )}
             </button>
+
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={isSendingReset}
+                className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
+              >
+                {isSendingReset ? 'Sending…' : 'Forgot password?'}
+              </button>
+            </div>
           </form>
         </div>
 
