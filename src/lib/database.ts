@@ -1,6 +1,9 @@
 import { supabase, isSupabaseConfigured, testSupabaseConnection } from './supabase';
 import { User, Project, BudgetEntry, BudgetCode, Notification } from '../types';
 
+// Centralized feature flag for server vs local mode
+export const useServerDb = import.meta.env.VITE_USE_SERVER_DB === 'true';
+
 // Helper function to handle database errors gracefully
 const handleDatabaseError = (error: any, operation: string) => {
   console.error(`Database operation failed (${operation}):`, error);
@@ -95,7 +98,7 @@ const transformNotification = (dbNotification: any): Notification => ({
 export const userService = {
   async getAll(): Promise<User[]> {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured) {
         throw new Error('Supabase not configured');
       }
       
@@ -161,6 +164,18 @@ export const userService = {
 // Budget Code operations
 export const budgetCodeService = {
   async getAll(): Promise<BudgetCode[]> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_codes.list → supabase');
+      const { data, error } = await supabase
+        .from('budget_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(transformBudgetCode);
+    }
+    
+    if (import.meta.env.DEV) console.log('[SRV] budget_codes.list → local');
     const { data, error } = await supabase
       .from('budget_codes')
       .select('*')
@@ -171,6 +186,28 @@ export const budgetCodeService = {
   },
 
   async create(code: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>): Promise<BudgetCode> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_codes.create → supabase', code);
+      const { data, error } = await supabase
+        .from('budget_codes')
+        .insert({
+          code: code.code,
+          name: code.name,
+          description: code.description,
+          budget: code.budget,
+          spent: code.spent,
+          is_active: code.isActive,
+          created_by: code.createdBy
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformBudgetCode(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_codes.create → local', code);
     const { data, error } = await supabase
       .from('budget_codes')
       .insert({
@@ -190,6 +227,29 @@ export const budgetCodeService = {
   },
 
   async update(id: string, updates: Partial<BudgetCode>): Promise<BudgetCode> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_codes.update → supabase', id, updates);
+      const { data, error } = await supabase
+        .from('budget_codes')
+        .update({
+          code: updates.code,
+          name: updates.name,
+          description: updates.description,
+          budget: updates.budget,
+          spent: updates.spent,
+          is_active: updates.isActive,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformBudgetCode(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_codes.update → local', id, updates);
     const { data, error } = await supabase
       .from('budget_codes')
       .update({
@@ -210,11 +270,16 @@ export const budgetCodeService = {
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('budget_codes')
-      .delete()
-      .eq('id', id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_codes.remove → supabase', id);
+      const { error } = await supabase.from('budget_codes').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
     
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_codes.remove → local', id);
+    const { error } = await supabase.from('budget_codes').delete().eq('id', id);
     if (error) throw error;
   }
 };
@@ -222,16 +287,70 @@ export const budgetCodeService = {
 // Project operations
 export const projectService = {
   async getAll(): Promise<Project[]> {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false });
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] projects.list → supabase');
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        handleDatabaseError(error, 'fetch projects');
+      }
+      
+      return data?.map(transformProject) || [];
+    }
     
-    if (error) throw error;
-    return data.map(transformProject);
+    // fallback (non-server mode): existing localStorage implementation
+    if (import.meta.env.DEV) console.log('[SRV] projects.list → local');
+    try {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase not configured');
+      }
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        handleDatabaseError(error, 'fetch projects');
+      }
+      
+      return data?.map(transformProject) || [];
+    } catch (error) {
+      handleDatabaseError(error, 'fetch projects');
+      return [];
+    }
   },
 
   async create(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] projects.create → supabase', project);
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          name: project.name,
+          description: project.description,
+          status: project.status,
+          priority: project.priority,
+          start_date: project.startDate,
+          end_date: project.endDate,
+          budget: project.budget,
+          spent: project.spent,
+          assigned_users: project.assignedUsers,
+          budget_codes: project.budgetCodes,
+          created_by: project.createdBy
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformProject(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] projects.create → local', project);
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -255,6 +374,32 @@ export const projectService = {
   },
 
   async update(id: string, updates: Partial<Project>): Promise<Project> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] projects.update → supabase', id, updates);
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          name: updates.name,
+          description: updates.description,
+          status: updates.status,
+          priority: updates.priority,
+          end_date: updates.endDate,
+          budget: updates.budget,
+          spent: updates.spent,
+          assigned_users: updates.assignedUsers,
+          budget_codes: updates.budgetCodes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformProject(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] projects.update → local', id, updates);
     const { data, error } = await supabase
       .from('projects')
       .update({
@@ -262,7 +407,6 @@ export const projectService = {
         description: updates.description,
         status: updates.status,
         priority: updates.priority,
-        start_date: updates.startDate,
         end_date: updates.endDate,
         budget: updates.budget,
         spent: updates.spent,
@@ -279,11 +423,16 @@ export const projectService = {
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] projects.remove → supabase', id);
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
     
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] projects.remove → local', id);
+    const { error } = await supabase.from('projects').delete().eq('id', id);
     if (error) throw error;
   }
 };
@@ -291,6 +440,18 @@ export const projectService = {
 // Budget Entry operations
 export const budgetEntryService = {
   async getAll(): Promise<BudgetEntry[]> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_entries.list → supabase');
+      const { data, error } = await supabase
+        .from('budget_entries')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(transformBudgetEntry);
+    }
+    
+    if (import.meta.env.DEV) console.log('[SRV] budget_entries.list → local');
     const { data, error } = await supabase
       .from('budget_entries')
       .select('*')
@@ -301,6 +462,29 @@ export const budgetEntryService = {
   },
 
   async create(entry: Omit<BudgetEntry, 'id' | 'createdAt'>): Promise<BudgetEntry> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → supabase', entry);
+      const { data, error } = await supabase
+        .from('budget_entries')
+        .insert({
+          project_id: entry.projectId,
+          budget_code_id: entry.budgetCodeId,
+          description: entry.description,
+          amount: entry.amount,
+          type: entry.type,
+          category: entry.category,
+          date: entry.date,
+          created_by: entry.createdBy
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformBudgetEntry(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → local', entry);
     const { data, error } = await supabase
       .from('budget_entries')
       .insert({
@@ -321,6 +505,29 @@ export const budgetEntryService = {
   },
 
   async update(id: string, updates: Partial<BudgetEntry>): Promise<BudgetEntry> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_entries.update → supabase', id, updates);
+      const { data, error } = await supabase
+        .from('budget_entries')
+        .update({
+          project_id: updates.projectId,
+          budget_code_id: updates.budgetCodeId,
+          description: updates.description,
+          amount: updates.amount,
+          type: updates.type,
+          category: updates.category,
+          date: updates.date
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformBudgetEntry(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_entries.update → local', id, updates);
     const { data, error } = await supabase
       .from('budget_entries')
       .update({
@@ -341,11 +548,16 @@ export const budgetEntryService = {
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('budget_entries')
-      .delete()
-      .eq('id', id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_entries.remove → supabase', id);
+      const { error } = await supabase.from('budget_entries').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
     
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] budget_entries.remove → local', id);
+    const { error } = await supabase.from('budget_entries').delete().eq('id', id);
     if (error) throw error;
   }
 };
@@ -353,6 +565,18 @@ export const budgetEntryService = {
 // Notification operations
 export const notificationService = {
   async getAll(): Promise<Notification[]> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] notifications.list → supabase');
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(transformNotification);
+    }
+    
+    if (import.meta.env.DEV) console.log('[SRV] notifications.list → local');
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -363,6 +587,28 @@ export const notificationService = {
   },
 
   async create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] notifications.create → supabase', notification);
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: notification.userId,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          read: notification.read,
+          action_url: notification.actionUrl
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return transformNotification(data);
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] notifications.create → local', notification);
     const { data, error } = await supabase
       .from('notifications')
       .insert({
@@ -382,6 +628,19 @@ export const notificationService = {
   },
 
   async markAsRead(id: string): Promise<void> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] notifications.markAsRead → supabase', id);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
+      
+      if (error) throw error;
+      return;
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] notifications.markAsRead → local', id);
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -391,6 +650,19 @@ export const notificationService = {
   },
 
   async markAllAsRead(userId: string): Promise<void> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] notifications.markAllAsRead → supabase', userId);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      return;
+    }
+    
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] notifications.markAllAsRead → local', userId);
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -400,11 +672,16 @@ export const notificationService = {
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] notifications.remove → supabase', id);
+      const { error } = await supabase.from('notifications').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
     
+    // fallback local
+    if (import.meta.env.DEV) console.log('[SRV] notifications.remove → local', id);
+    const { error } = await supabase.from('notifications').delete().eq('id', id);
     if (error) throw error;
   }
 };

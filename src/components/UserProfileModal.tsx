@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Building2, Users, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useMyProfile, saveMyNameInline } from '../lib/profile';
 
 interface UserProfileModalProps {
   onClose: () => void;
 }
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
-  const { currentUser, updateProfileName } = useAuth();
+  const { role, loading: isLoading } = useAuth();
+  const { profile, setProfile } = useMyProfile();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,65 +17,40 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
     division: ''
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      // Load existing profile data from localStorage or use defaults
-      const savedProfile = localStorage.getItem(`userProfile_${currentUser.id}`);
-      if (savedProfile) {
-        try {
-          const profile = JSON.parse(savedProfile);
-          setFormData({
-            name: currentUser.name,
-            email: currentUser.email,
-            unit: profile.unit || '',
-            division: profile.division || ''
-          });
-        } catch (error) {
-          setFormData({
-            name: currentUser.name,
-            email: currentUser.email,
-            unit: '',
-            division: ''
-          });
-        }
-      } else {
-        setFormData({
-          name: currentUser.name,
-          email: currentUser.email,
-          unit: '',
-          division: ''
-        });
-      }
+    if (profile) {
+      setFormData({
+        name: profile.name ?? '',
+        email: profile.email ?? '',
+        unit: profile.unit ?? '',
+        division: profile.division ?? ''
+      });
     }
-  }, [currentUser]);
+  }, [profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setErrorMsg(null);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Save profile data to localStorage
-      const profileData = {
-        unit: formData.unit,
-        division: formData.division,
-        updatedAt: new Date().toISOString()
-      };
-      
-      localStorage.setItem(`userProfile_${currentUser?.id}`, JSON.stringify(profileData));
-      // Update display name in auth context and persisted session
-      updateProfileName(formData.name);
-      
+      // Optimistic update
+      const previous = profile;
+      if (previous) {
+        setProfile({ ...previous, name: formData.name });
+      }
+      const updated = await saveMyNameInline(formData.name);
+      setProfile(updated);
       setSuccess(true);
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (error) {
-      alert('Failed to save profile. Please try again.');
+      if (profile) setProfile(profile); // rollback
+      setErrorMsg((error as any)?.message || 'Failed to save profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -122,14 +99,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-lg font-medium">{currentUser?.initials}</span>
+               <span className="text-white text-lg font-medium">{profile?.initials ?? ''}</span>
               </div>
               <div>
                 <p className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                  {currentUser?.name}
+                  {profile?.name ?? ''}
                 </p>
                 <p className="text-xs text-blue-700 dark:text-blue-400 capitalize">
-                  {currentUser?.role.replace('_', ' ')}
+                  {isLoading ? '' : (role ?? '').replace('_', ' ')}
                 </p>
               </div>
             </div>
@@ -230,6 +207,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
               <span>{isSaving ? 'Saving...' : 'Save Profile'}</span>
             </button>
           </div>
+          {errorMsg && (
+            <div className="text-sm text-red-600 dark:text-red-400">{errorMsg}</div>
+          )}
         </form>
       </div>
     </div>

@@ -9,14 +9,27 @@ export default function UpdatePassword() {
 
   useEffect(() => {
     const sub = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setStatus('ready')
-    })
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the email reset link → send to update-password
+        window.location.assign('/update-password');
+      } else if (event === 'SIGNED_IN') {
+        // Normal login
+        setStatus('ready');
+      }
+    });
+  
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setStatus('ready')
-      else setStatus('checking')
-    })
-    return () => { sub.data.subscription.unsubscribe() }
-  }, [])
+      if (data.session) {
+        setStatus('ready');
+      } else {
+        setStatus('checking');
+      }
+    });
+  
+    return () => {
+      sub.data.subscription.unsubscribe();
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()

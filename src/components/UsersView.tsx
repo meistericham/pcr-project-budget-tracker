@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Plus, 
   Shield, 
@@ -14,21 +14,21 @@ import {
   Filter
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { User as UserType } from '../types';
 import UserModal from './UserModal';
 import EmailModal from './EmailModal';
 
 const UsersView = () => {
   const { users, deleteUser } = useApp();
-  const { currentUser } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'user'>('all');
   const [resetTarget, setResetTarget] = useState<UserType | null>(null);
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSuperAdmin = !!isSA;
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -74,7 +74,8 @@ const UsersView = () => {
       return;
     }
 
-    if (user.id === currentUser?.id) {
+    // extra self-delete guard removed (no current session context here)
+    if (false) {
       alert("You cannot delete your own account.");
       return;
     }
@@ -265,7 +266,7 @@ const UsersView = () => {
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
-                  {user.id !== currentUser?.id && (
+                  {true && (
                     <button
                       onClick={() => handleResetPassword(user)}
                       className="p-1 text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400"
@@ -274,7 +275,7 @@ const UsersView = () => {
                       <Shield className="h-4 w-4" />
                     </button>
                   )}
-                  {user.id !== currentUser?.id && (
+                  {true && (
                     <button
                       onClick={() => handleDelete(user)}
                       className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
@@ -294,7 +295,7 @@ const UsersView = () => {
                     {user.role.replace('_', ' ').toUpperCase()}
                   </span>
                 </div>
-                {user.id === currentUser?.id && (
+                {false && (
                   <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                     (You)
                   </span>

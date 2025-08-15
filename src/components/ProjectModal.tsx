@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Users, Hash, AlertTriangle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { Project } from '../types';
 import { formatMYR } from '../utils/currency';
 
@@ -12,7 +12,7 @@ interface ProjectModalProps {
 
 const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   const { addProject, updateProject, users, budgetCodes, divisions, units } = useApp();
-  const { currentUser } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -28,8 +28,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   });
 
   const activeBudgetCodes = budgetCodes.filter(code => code.isActive);
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+  const isSuperAdmin = !!isSA;
+  const isAdmin = !!isSA; // tighten to super admin only for mutations
 
   useEffect(() => {
     if (project) {
@@ -66,7 +66,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
       assignedUsers: formData.assignedUsers,
       budgetCodes: formData.budgetCodes,
       unitId: formData.unitId,
-      createdBy: currentUser?.id || '1'
+      createdBy: users[0]?.id || '1'
     };
 
     if (project) {
@@ -103,8 +103,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
 
   // Check if user can edit this project
   const canEdit = isSuperAdmin || 
-    (isAdmin && (!project || project.createdBy === currentUser?.id)) ||
-    (!project || project.assignedUsers.includes(currentUser?.id || ''));
+    (isAdmin && (!project)) ||
+    (!project);
 
   if (!canEdit && project) {
     return (
@@ -386,7 +386,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
                     checked={formData.assignedUsers.includes(user.id)}
                     onChange={() => handleUserToggle(user.id)}
                     className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                    disabled={!isSuperAdmin && !isAdmin && user.id !== currentUser?.id}
+                      disabled={!isSuperAdmin && !isAdmin}
                   />
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">

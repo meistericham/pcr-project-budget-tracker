@@ -16,21 +16,21 @@ import {
   Filter
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { BudgetCode } from '../types';
 import { formatMYR } from '../utils/currency';
 import BudgetCodeModal from './BudgetCodeModal';
 
 const BudgetCodesView = () => {
   const { budgetCodes, deleteBudgetCode, toggleBudgetCodeStatus, users, settings } = useApp();
-  const { currentUser } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
   const [showModal, setShowModal] = useState(false);
   const [editingCode, setEditingCode] = useState<BudgetCode | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+  const isSuperAdmin = !!isSA;
+  const isAdmin = !!isSA; // tighten: only super_admins can mutate for now
 
   const filteredCodes = budgetCodes.filter(code => {
     const matchesSearch = code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||

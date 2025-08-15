@@ -98,4 +98,4 @@ export interface AppSettings {
   allowNegativeBudget: boolean;
 }
 
-export type ViewMode = 'projects' | 'budget' | 'users' | 'budget-codes' | 'settings';
+export type ViewMode = 'projects' | 'budget' | 'users' | 'budget-codes' | 'settings' | 'admin-users';

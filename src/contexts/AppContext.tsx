@@ -96,7 +96,7 @@ const createDebouncedSave = (key: string) => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { user, profile } = useAuth();
   const [currentView, setCurrentView] = useState<ViewMode>('projects');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -383,44 +383,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: 'u3', name: 'Digital Marketing Unit', divisionId: 'd2', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' }
   ];
 
-  // Initialize state with persistent data
+  // Initialize state with persistent data - skip defaults in server mode
   const [settings, setSettings] = useState<AppSettings>(() => 
-    loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings)
+    useServerDb ? defaultSettings : loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings)
   );
 
   const [users, setUsers] = useState<User[]>(() => 
-    loadFromStorage(STORAGE_KEYS.USERS, defaultUsers)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.USERS, defaultUsers)
   );
 
   const [budgetCodes, setBudgetCodes] = useState<BudgetCode[]>(() => 
-    loadFromStorage(STORAGE_KEYS.BUDGET_CODES, defaultBudgetCodes)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_CODES, defaultBudgetCodes)
   );
 
   const [divisions, setDivisions] = useState<Division[]>(() =>
-    loadFromStorage(STORAGE_KEYS.DIVISIONS, defaultDivisions)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.DIVISIONS, defaultDivisions)
   );
 
   const [units, setUnits] = useState<Unit[]>(() =>
-    loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits)
   );
 
   const [projects, setProjects] = useState<Project[]>(() => 
-    loadFromStorage(STORAGE_KEYS.PROJECTS, defaultProjects)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.PROJECTS, defaultProjects)
   );
 
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>(() => 
-    loadFromStorage(STORAGE_KEYS.BUDGET_ENTRIES, defaultBudgetEntries)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_ENTRIES, defaultBudgetEntries)
   );
 
   const [notifications, setNotifications] = useState<Notification[]>(() => 
-    loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, [])
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, [])
   );
 
   // Optional server hydration
   useEffect(() => {
     if (!useServerDb) return;
+    
+    let cancelled = false;
     (async () => {
       try {
+        if (import.meta.env.DEV) console.log('[CTX] hydrate from supabase');
         const [remoteUsers, remoteCodes, remoteProjects, remoteEntries, remoteNotifs] = await Promise.all([
           userService.getAll().catch(() => users),
           budgetCodeService.getAll().catch(() => budgetCodes),
@@ -428,42 +431,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           budgetEntryService.getAll().catch(() => budgetEntries),
           notificationService.getAll().catch(() => notifications)
         ]);
-        setUsers(remoteUsers);
-        setBudgetCodes(remoteCodes);
-        setProjects(remoteProjects);
-        setBudgetEntries(remoteEntries);
-        setNotifications(remoteNotifs);
+        
+        if (!cancelled) {
+          setUsers(remoteUsers);
+          setBudgetCodes(remoteCodes);
+          setProjects(remoteProjects);
+          setBudgetEntries(remoteEntries);
+          setNotifications(remoteNotifs);
+        }
       } catch (e) {
-        console.error('Server hydration failed; using local data', e);
+        console.error('[CTX] hydrate error', e);
+        // Fallback to existing local data on error
       }
     })();
+    
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save to localStorage whenever state changes (optimized with debouncing)
+  // Save to localStorage whenever state changes (optimized with debouncing) - only when not using server
   useEffect(() => {
-    debouncedSaveUsers(users);
-  }, [users, debouncedSaveUsers]);
+    if (!useServerDb) {
+      debouncedSaveUsers(users);
+    }
+  }, [users, debouncedSaveUsers, useServerDb]);
 
   useEffect(() => {
-    debouncedSaveProjects(projects);
-  }, [projects, debouncedSaveProjects]);
+    if (!useServerDb) {
+      debouncedSaveProjects(projects);
+    }
+  }, [projects, debouncedSaveProjects, useServerDb]);
 
   useEffect(() => {
-    debouncedSaveBudgetEntries(budgetEntries);
-  }, [budgetEntries, debouncedSaveBudgetEntries]);
+    if (!useServerDb) {
+      debouncedSaveBudgetEntries(budgetEntries);
+    }
+  }, [budgetEntries, debouncedSaveBudgetEntries, useServerDb]);
 
   useEffect(() => {
-    debouncedSaveBudgetCodes(budgetCodes);
-  }, [budgetCodes, debouncedSaveBudgetCodes]);
+    if (!useServerDb) {
+      debouncedSaveBudgetCodes(budgetCodes);
+    }
+  }, [budgetCodes, debouncedSaveBudgetCodes, useServerDb]);
 
   useEffect(() => {
-    saveToStorage(STORAGE_KEYS.DIVISIONS, divisions);
-  }, [divisions]);
+    if (!useServerDb) {
+      saveToStorage(STORAGE_KEYS.DIVISIONS, divisions);
+    }
+  }, [divisions, useServerDb]);
 
   useEffect(() => {
-    saveToStorage(STORAGE_KEYS.UNITS, units);
-  }, [units]);
+    if (!useServerDb) {
+      saveToStorage(STORAGE_KEYS.UNITS, units);
+    }
+  }, [units, useServerDb]);
   const addDivision = (divisionData: Omit<Division, 'id' | 'createdAt'>) => {
     const newDivision: Division = { ...divisionData, id: Date.now().toString(), createdAt: new Date().toISOString() };
     setDivisions(prev => [...prev, newDivision]);
@@ -507,9 +528,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Notification functions
   const addNotification = async (notificationData: Omit<Notification, 'id' | 'createdAt'>) => {
-    const newNotification: Notification = useServerDb
-      ? await notificationService.create(notificationData)
-      : { ...notificationData, id: Date.now().toString(), createdAt: new Date().toISOString() } as Notification;
+    let newNotification: Notification;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] addNotification → service');
+      newNotification = await notificationService.create(notificationData);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] addNotification → local');
+      newNotification = { ...notificationData, id: Date.now().toString(), createdAt: new Date().toISOString() } as Notification;
+    }
     setNotifications(prev => {
       const updated = [newNotification, ...prev];
       // Keep only last 100 notifications to prevent storage bloat
@@ -518,25 +544,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markNotificationAsRead = (id: string) => {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] markNotificationAsRead → service');
+      notificationService.markAsRead(id).catch(console.error);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] markNotificationAsRead → local');
+    }
     setNotifications(prev => prev.map(notification => 
       notification.id === id ? { ...notification, read: true } : notification
     ));
   };
 
   const markAllNotificationsAsRead = () => {
-    if (!currentUser) return;
+    if (!user) return;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] markAllNotificationsAsRead → service');
+      notificationService.markAllAsRead(user.id).catch(console.error);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] markAllNotificationsAsRead → local');
+    }
     setNotifications(prev => prev.map(notification => 
-      notification.userId === currentUser.id ? { ...notification, read: true } : notification
+      notification.userId === user.id ? { ...notification, read: true } : notification
     ));
   };
 
   const deleteNotification = (id: string) => {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] deleteNotification → service');
+      notificationService.delete(id).catch(console.error);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] deleteNotification → local');
+    }
     setNotifications(prev => prev.filter(notification => notification.id !== id));
   };
 
   const getUnreadNotificationCount = () => {
-    if (!currentUser) return 0;
-    return notifications.filter(n => !n.read && n.userId === currentUser.id).length;
+    if (!user) return 0;
+    return notifications.filter(n => !n.read && n.userId === user.id).length;
   };
 
   // Helper function to create notifications for all users
@@ -605,8 +649,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     let newProject: Project;
     if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] addProject → service');
       newProject = await projectService.create(projectData);
     } else {
+      if (import.meta.env.DEV) console.log('[CTX] addProject → local');
       newProject = { ...projectData, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Project;
     }
     setProjects(prev => [...prev, newProject]);
@@ -637,23 +683,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const oldProject = projects.find(p => p.id === id);
     if (!oldProject) return;
 
-    const updatedProject = useServerDb ? await projectService.update(id, updates) : { ...oldProject, ...updates, updatedAt: new Date().toISOString() } as Project;
+    let updatedProject: Project;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] updateProject → service');
+      updatedProject = await projectService.update(id, updates);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] updateProject → local');
+      updatedProject = { ...oldProject, ...updates, updatedAt: new Date().toISOString() } as Project;
+    }
     setProjects(prev => prev.map(project => 
       project.id === id ? updatedProject : project
     ));
 
     // Notify all users about project update
-    const updaterName = currentUser?.name || 'Someone';
+    const updaterName = profile?.name || 'Someone';
     notifyAllUsers(
       'project_updated',
       'Project Updated',
       `${updaterName} updated the project: ${updatedProject.name}`,
       { 
         projectId: id, 
-        updatedBy: currentUser?.id,
+        updatedBy: user?.id,
         changes: Object.keys(updates)
       },
-      currentUser?.id
+      user?.id
     );
 
     // Check for budget alerts
@@ -703,33 +756,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const project = projects.find(p => p.id === id);
     if (!project) return;
     // Authorization: only super admins can delete any project; admins can delete projects they created; users cannot delete
-    const isSuperAdmin = currentUser?.role === 'super_admin';
-    const isAdmin = currentUser?.role === 'admin';
-    const canDelete = !!currentUser && (isSuperAdmin || (isAdmin && project.createdBy === currentUser.id));
+    const isSuperAdmin = profile?.role === 'super_admin';
+    const isAdmin = profile?.role === 'admin';
+    const canDelete = !!user && (isSuperAdmin || (isAdmin && project.createdBy === user.id));
     if (!canDelete) {
       // Silently ignore or log; optional: add a notification later
       return;
     }
-    if (useServerDb) await projectService.delete(id);
+    
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] deleteProject → service');
+      await projectService.delete(id);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] deleteProject → local');
+    }
     setProjects(prev => prev.filter(project => project.id !== id));
     setBudgetEntries(prev => prev.filter(entry => entry.projectId !== id));
 
     // Notify all users about project deletion
-    const deleterName = currentUser?.name || 'Someone';
+    const deleterName = profile?.name || 'Someone';
     notifyAllUsers(
       'project_updated',
       'Project Deleted',
       `${deleterName} deleted the project: ${project.name}`,
-      { projectId: id, deletedBy: currentUser?.id },
-      currentUser?.id
+      { projectId: id, deletedBy: user?.id },
+      user?.id
     );
   };
 
   const addBudgetEntry = async (entryData: Omit<BudgetEntry, 'id' | 'createdAt'>) => {
     let newEntry: BudgetEntry;
     if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] addBudgetEntry → service');
       newEntry = await budgetEntryService.create(entryData);
     } else {
+      if (import.meta.env.DEV) console.log('[CTX] addBudgetEntry → local');
       newEntry = { ...entryData, unitId: entryData.unitId ?? projects.find(p => p.id === entryData.projectId)?.unitId, divisionId: entryData.divisionId ?? units.find(u => u.id === (projects.find(p => p.id === entryData.projectId)?.unitId || ''))?.divisionId, id: Date.now().toString(), createdAt: new Date().toISOString() } as BudgetEntry;
     }
     setBudgetEntries(prev => [...prev, newEntry]);
@@ -778,7 +839,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateBudgetEntry = async (id: string, updates: Partial<BudgetEntry>) => {
     const oldEntry = budgetEntries.find(e => e.id === id);
     if (!oldEntry) return;
-    const updated = useServerDb ? await budgetEntryService.update(id, updates) : { ...oldEntry, ...updates } as BudgetEntry;
+    
+    let updated: BudgetEntry;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] updateBudgetEntry → service');
+      updated = await budgetEntryService.update(id, updates);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] updateBudgetEntry → local');
+      updated = { ...oldEntry, ...updates } as BudgetEntry;
+    }
     setBudgetEntries(prev => prev.map(entry => (entry.id === id ? updated : entry)));
 
     // Update budget code spent amounts if amount or budget code changed
@@ -810,7 +879,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteBudgetEntry = async (id: string) => {
     const entry = budgetEntries.find(e => e.id === id);
     if (!entry) return;
-    if (useServerDb) await budgetEntryService.delete(id);
+    
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetEntry → service');
+      await budgetEntryService.delete(id);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetEntry → local');
+    }
     // Update project spent amount
     if (entry.type === 'expense') {
       const project = projects.find(p => p.id === entry.projectId);
@@ -832,14 +907,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addUser = async (userData: Omit<User, 'id' | 'createdAt'>) => {
-    const newUser: User = useServerDb ? await userService.create(userData) : { ...userData, id: Date.now().toString(), createdAt: new Date().toISOString() } as User;
+    let newUser: User;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] addUser → service');
+      newUser = await userService.create(userData);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] addUser → local');
+      newUser = { ...userData, id: Date.now().toString(), createdAt: new Date().toISOString() } as User;
+    }
     setUsers(prev => [...prev, newUser]);
 
     // Notify all admins about new user
     const adminUsers = users.filter(u => u.role === 'admin' || u.role === 'super_admin');
-    const creatorName = currentUser?.name || 'Someone';
+    const creatorName = profile?.name || 'Someone';
     notifyUsers(
-      adminUsers.map(u => u.id).filter(id => id !== currentUser?.id),
+      adminUsers.map(u => u.id).filter(id => id !== user?.id),
       'user_assigned',
       'New User Added',
       `${creatorName} added a new user: ${newUser.name} (${newUser.role.replace('_', ' ')})`,
@@ -848,12 +930,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
-    const next = useServerDb ? await userService.update(id, updates) : undefined;
+    let next: User | undefined;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] updateUser → service');
+      next = await userService.update(id, updates);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] updateUser → local');
+      next = undefined;
+    }
     setUsers(prev => prev.map(user => (user.id === id ? (next || { ...user, ...updates }) : user)));
   };
 
   const deleteUser = async (id: string) => {
-    if (useServerDb) await userService.delete(id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] deleteUser → service');
+      await userService.delete(id);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] deleteUser → local');
+    }
     setUsers(prev => prev.filter(user => user.id !== id));
     // Also remove user from project assignments
     setProjects(prev => prev.map(project => ({
@@ -865,12 +959,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addBudgetCode = async (codeData: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newCode: BudgetCode = useServerDb ? await budgetCodeService.create(codeData) : { ...codeData, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as BudgetCode;
+    let newCode: BudgetCode;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] addBudgetCode → service');
+      newCode = await budgetCodeService.create(codeData);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] addBudgetCode → local');
+      newCode = { ...codeData, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as BudgetCode;
+    }
     setBudgetCodes(prev => [...prev, newCode]);
   };
 
   const updateBudgetCode = async (id: string, updates: Partial<BudgetCode>) => {
-    const next = useServerDb ? await budgetCodeService.update(id, updates) : undefined;
+    let next: BudgetCode | undefined;
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] updateBudgetCode → service');
+      next = await budgetCodeService.update(id, updates);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] updateBudgetCode → local');
+      next = undefined;
+    }
     setBudgetCodes(prev => prev.map(code => (code.id === id ? (next || { ...code, ...updates, updatedAt: new Date().toISOString() }) : code)));
     
     // Check for budget alerts if budget was changed
@@ -880,7 +988,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteBudgetCode = async (id: string) => {
-    if (useServerDb) await budgetCodeService.delete(id);
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetCode → service');
+      await budgetCodeService.delete(id);
+    } else {
+      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetCode → local');
+    }
     setBudgetCodes(prev => prev.filter(code => code.id !== id));
     // Remove budget code from projects
     setProjects(prev => prev.map(project => ({
@@ -894,12 +1007,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })));
   };
 
-  const toggleBudgetCodeStatus = (id: string) => {
+  const toggleBudgetCodeStatus = async (id: string) => {
+    const current = budgetCodes.find(c => c.id === id);
+    if (!current) return;
+    const nextActive = !current.isActive;
+    // Optimistic update
     setBudgetCodes(prev => prev.map(code => 
       code.id === id 
-        ? { ...code, isActive: !code.isActive, updatedAt: new Date().toISOString() }
+        ? { ...code, isActive: nextActive, updatedAt: new Date().toISOString() }
         : code
     ));
+    if (useServerDb) {
+      try {
+        await budgetCodeService.update(id, { isActive: nextActive });
+      } catch (e) {
+        // rollback on error
+        setBudgetCodes(prev => prev.map(code => 
+          code.id === id 
+            ? { ...code, isActive: !nextActive }
+            : code
+        ));
+        console.error('Failed to toggle budget code status on server', e);
+      }
+    }
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {

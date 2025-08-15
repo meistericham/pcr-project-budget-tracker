@@ -1,6 +1,6 @@
-import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { AppProvider, useApp } from './contexts/AppContext';
+import { useAuth } from './contexts/AuthContext';
+import { useApp } from './contexts/AppContext';
+import { useEffect } from 'react';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
 import TopNavigation from './components/TopNavigation';
@@ -12,6 +12,9 @@ import SettingsView from './components/SettingsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import UpdatePassword from './pages/UpdatePassword';
 import UsersAdmin from './pages/UsersAdmin';
+import Debug from './pages/Debug';
+import { supabase } from './lib/supabase';
+import React from 'react';
 
 const AppContent = () => {
   const { currentView } = useApp();
@@ -48,10 +51,25 @@ const AppContent = () => {
   );
 };
 
-const AuthenticatedApp = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+// Handle password recovery redirects
+const PasswordRecoveryHandler = ({ children }: { children: React.ReactNode }) => {
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        window.location.assign('/update-password');
+      }
+    });
 
-  if (isLoading) {
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return <>{children}</>;
+};
+
+const AuthenticatedApp = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -67,9 +85,10 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <AppProvider>
+    <>
+      {!import.meta.env.PROD && <DevRoleBanner />}
       <AppContent />
-    </AppProvider>
+    </>
   );
 };
 
@@ -81,9 +100,7 @@ function App() {
     if (pathname === '/update-password') {
       return (
         <ErrorBoundary>
-          <ThemeProvider>
-            <UpdatePassword />
-          </ThemeProvider>
+          <UpdatePassword />
         </ErrorBoundary>
       );
     }
@@ -91,11 +108,17 @@ function App() {
     if (pathname === '/admin/users') {
       return (
         <ErrorBoundary>
-          <ThemeProvider>
-            <AuthProvider>
-              <UsersAdmin />
-            </AuthProvider>
-          </ThemeProvider>
+          {!import.meta.env.PROD && <DevRoleBanner />}
+          <UsersAdmin />
+        </ErrorBoundary>
+      );
+    }
+
+    if (pathname === '/debug') {
+      return (
+        <ErrorBoundary>
+          {!import.meta.env.PROD && <DevRoleBanner />}
+          <Debug />
         </ErrorBoundary>
       );
     }
@@ -103,13 +126,23 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <AuthenticatedApp />
-        </AuthProvider>
-      </ThemeProvider>
+      <PasswordRecoveryHandler>
+        {!import.meta.env.PROD && <DevRoleBanner />}
+        <AuthenticatedApp />
+      </PasswordRecoveryHandler>
     </ErrorBoundary>
   );
 }
 
 export default App;
+
+const DevRoleBanner: React.FC = () => {
+  const { role, user } = useAuth() as any;
+  const uid = user?.id || '';
+  if (import.meta.env.PROD) return null as any;
+  return (
+    <div className="fixed bottom-2 left-2 z-50 text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-900 border border-yellow-300 shadow">
+      Role source: profiles | role={role ?? '(none)'} | uid={uid || '(none)'}
+    </div>
+  );
+};

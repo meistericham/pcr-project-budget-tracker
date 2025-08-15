@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { ViewMode } from '../types';
 import { formatMYR } from '../utils/currency';
 
@@ -24,7 +25,9 @@ const Sidebar = () => {
     sidebarCollapsed, 
     setSidebarCollapsed 
   } = useApp();
-  const { currentUser } = useAuth();
+  const { profile, role, loading: isLoading } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
+  if (import.meta.env.DEV) console.log('[Sidebar] isSA=', isSA);
 
   const navigationItems = [
     { 
@@ -52,13 +55,19 @@ const Sidebar = () => {
       adminOnly: true
     },
     { 
+      icon: Shield, 
+      label: 'User Management', 
+      view: 'admin-users' as ViewMode,
+      superAdminOnly: true
+    },
+    { 
       icon: Settings, 
       label: 'Settings', 
       view: 'settings' as ViewMode
     }
   ];
 
-  const canAccessAdminFeatures = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+  const canAccessAdminFeatures = !!isSA;
 
   const totalProjectBudget = projects.reduce((sum, project) => sum + project.budget, 0);
   const totalProjectSpent = projects.reduce((sum, project) => sum + project.spent, 0);
@@ -121,11 +130,17 @@ const Sidebar = () => {
           <nav className={`space-y-1 lg:space-y-2 ${sidebarCollapsed ? 'lg:px-2' : 'px-4'}`}>
             {navigationItems.map((item) => {
               if (item.adminOnly && !canAccessAdminFeatures) return null;
+              if (item.superAdminOnly && !isSA) return null;
               
               return (
                 <button
                   key={item.view}
                   onClick={() => {
+                    if (item.view === 'admin-users') {
+                      // Navigate to admin users page
+                      window.location.href = '/admin/users';
+                      return;
+                    }
                     setCurrentView(item.view);
                     // Close sidebar on mobile after selection
                     if (window.innerWidth < 1024) {
@@ -134,7 +149,7 @@ const Sidebar = () => {
                   }}
                   className={`w-full group flex items-center ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between px-4'} py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
                     currentView === item.view
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 shadow-sm'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:blue-300 shadow-sm'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                   }`}
                   title={sidebarCollapsed ? item.label : undefined}
@@ -188,7 +203,7 @@ const Sidebar = () => {
               </div>
 
               {/* Budget Code Overview */}
-              {canAccessAdminFeatures && (
+               {canAccessAdminFeatures && (
                 <div className="p-3 lg:p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl border border-purple-100 dark:border-purple-800">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Budget Codes</h3>
                   <div className="space-y-2">
@@ -221,20 +236,20 @@ const Sidebar = () => {
             {/* User Info */}
              <div className={`mt-4 lg:mt-6 mx-4 p-3 lg:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl ${sidebarCollapsed ? 'lg:mx-2' : ''}`}>
                <div className={`flex items-center ${sidebarCollapsed ? 'lg:justify-center' : 'space-x-3'}`}>
-                 <div className="w-8 lg:w-10 h-8 lg:h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                   <span className="text-white text-xs lg:text-sm font-medium">{currentUser?.initials}</span>
+                  <div className="w-8 lg:w-10 h-8 lg:h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                   <span className="text-white text-xs lg:text-sm font-medium">{profile?.initials ?? ''}</span>
                  </div>
                  {!sidebarCollapsed && (
                    <div className="flex-1 min-w-0">
                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                       {currentUser?.name}
+                       {profile?.name ?? ''}
                      </p>
                      <div className="flex items-center space-x-1">
-                       {currentUser?.role === 'super_admin' && (
+                       {isSA && (
                          <Shield className="h-3 w-3 text-red-500" />
                        )}
-                       <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                         {currentUser?.role.replace('_', ' ')}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                         {isLoading ? '' : (role ?? '').replace('_', ' ')}
                        </p>
                      </div>
                    </div>

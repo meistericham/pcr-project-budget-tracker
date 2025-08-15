@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Save, 
   Building2, 
   DollarSign, 
-  Calendar, 
   Bell, 
   Shield, 
   Database,
-  AlertTriangle,
-  Clock,
   FileText,
   Settings as SettingsIcon,
   Globe,
@@ -20,7 +17,7 @@ import {
   Key
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { useTheme } from '../contexts/ThemeContext';
 import DatabaseSetup from './DatabaseSetup';
 import DatabaseStatus from './DatabaseStatus';
@@ -30,7 +27,7 @@ import NotificationTest from './NotificationTest';
 
 const SettingsView = () => {
   const { settings, updateSettings, divisions, units, addDivision, deleteDivision, addUnit, deleteUnit } = useApp();
-  const { currentUser } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'general' | 'budget' | 'notifications' | 'security' | 'backup' | 'database' | 'integrations' | 'categories'>('general');
   const [newDivisionName, setNewDivisionName] = useState('');
@@ -68,8 +65,7 @@ const SettingsView = () => {
     setHasChanges(false);
   };
 
-  const isAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
-  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSuperAdmin = !!isSA;
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon, adminOnly: false },
@@ -225,7 +221,7 @@ const SettingsView = () => {
             <div className="flex items-center space-x-2">
               <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                Current User: {currentUser?.name} ({currentUser?.role.replace('_', ' ').toUpperCase()})
+                Current User: (session) | Admin rights: {isSuperAdmin ? 'SUPER ADMIN' : 'NO'}
               </span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Search, 
   Plus, 
@@ -9,13 +9,13 @@ import {
   Download,
   LogOut,
   Mail,
-  User,
   Edit,
   Menu,
-  X
+  
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useMyProfile } from '../lib/profile';
 import { useApp } from '../contexts/AppContext';
 import NotificationPanel from './NotificationPanel';
 import ReportExportModal from './ReportExportModal';
@@ -23,9 +23,10 @@ import EmailModal from './EmailModal';
 import UserProfileModal from './UserProfileModal';
 
 const TopNavigation = () => {
-  const { theme, setTheme, isDark } = useTheme();
-  const { logout, currentUser } = useAuth();
-  const { currentView, setCurrentView, getUnreadNotificationCount, projects, budgetEntries, sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { setTheme, isDark } = useTheme();
+  const { logout, role, loading: isLoading } = useAuth();
+  const { profile } = useMyProfile();
+  const { currentView, setCurrentView, getUnreadNotificationCount, budgetEntries, setSidebarCollapsed } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -198,12 +199,12 @@ const TopNavigation = () => {
                 className="flex items-center space-x-2 lg:space-x-3 p-1 lg:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <div className="w-6 lg:w-8 h-6 lg:h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs lg:text-sm font-medium">{currentUser?.initials}</span>
+                  <span className="text-white text-xs lg:text-sm font-medium">{profile?.initials ?? ''}</span>
                 </div>
                 <div className="hidden sm:block lg:block text-left">
-                  <p className="text-xs lg:text-sm font-medium text-gray-900 dark:text-white">{currentUser?.name}</p>
+                  <p className="text-xs lg:text-sm font-medium text-gray-900 dark:text-white">{profile?.name ?? ''}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {currentUser?.role.replace('_', ' ')}
+                    {isLoading ? '' : (role ?? '').replace('_', ' ')}
                   </p>
                 </div>
               </button>

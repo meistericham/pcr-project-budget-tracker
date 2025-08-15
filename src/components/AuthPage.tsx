@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Building2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Building2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import EnvWarning from './EnvWarning';
@@ -18,14 +18,18 @@ const AuthPage: React.FC = () => {
   const [resetInfo, setResetInfo] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isQuickLoginLoading, setIsQuickLoginLoading] = useState(false);
+  const [quickBannerMessage, setQuickBannerMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
-
+    setIsLoading(true);
+  
     try {
       await login(formData.email, formData.password);
+      // Always redirect to default route; no role branching
+      window.location.replace('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
@@ -63,12 +67,55 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const handleQuickAdminLogin = async () => {
+    try {
+      setError('');
+      setIsQuickLoginLoading(true);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: 'hisyamudin@sarawaktourism.com',
+        password: '11223344'
+      });
+      if (signInError) throw new Error(signInError.message);
+
+      // Ensure session is established
+      await supabase.auth.getUser();
+
+      // Show confirmation banner briefly, then navigate
+      setQuickBannerMessage('Logged in as hisyamudin (super_admin)');
+      setTimeout(() => {
+        window.location.assign('/debug');
+      }, 200);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Quick login failed');
+    } finally {
+      setIsQuickLoginLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
       {/* AppBootOK Indicator */}
       <div className="fixed top-2 left-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded text-xs font-mono">
         AppBootOK
       </div>
+
+      {/* Quick Admin Login button (top-right) */}
+      <button
+        type="button"
+        onClick={handleQuickAdminLogin}
+        disabled={isQuickLoginLoading}
+        className="fixed top-2 right-2 text-xs px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed shadow"
+      >
+        {isQuickLoginLoading ? 'Logging in…' : 'Quick Admin Login'}
+      </button>
+
+      {/* Confirmation banner */}
+      {quickBannerMessage && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 bg-green-100 dark:bg-green-900 text-green-900 dark:text-green-100 px-4 py-2 rounded-md shadow flex items-center space-x-2 z-50">
+          <CheckCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">{quickBannerMessage}</span>
+        </div>
+      )}
       
       <div className="w-full max-w-md">
         {/* Environment Warning */}

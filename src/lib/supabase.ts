@@ -20,7 +20,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
     storageKey: 'pcr-tracker-auth', // Unique storage key to avoid collisions
   },
   realtime: {
@@ -29,13 +29,19 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     }
   }
 });
-
+// helpful in dev & prod to debug in DevTools
+if (typeof window !== 'undefined') (window as any).supabase = supabase;
 // Export environment validation status
 export const isSupabaseConfigured = !!(url && anon && url !== 'https://demo.supabase.co' && anon !== 'demo-key');
 
 // Log configuration status
 if (!isSupabaseConfigured) {
   console.warn('[SUPABASE] Using demo configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.development for real functionality.');
+}
+
+// Expose client to window for debugging in development
+if (import.meta.env.DEV) {
+  (window as any).supabase = supabase;
 }
 
 // Helper function to test database connection

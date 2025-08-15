@@ -110,6 +110,11 @@ POSTGRES_PASSWORD=$DB_PASSWORD
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 
+# Supabase Configuration (REQUIRED for production)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
 # Security
 JWT_SECRET=$JWT_SECRET
 SESSION_SECRET=$(openssl rand -base64 32)

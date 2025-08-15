@@ -18,7 +18,7 @@ import {
   Mail
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import { Project } from '../types';
 import { formatMYR } from '../utils/currency';
 import { formatDate } from '../utils/date';
@@ -29,7 +29,7 @@ import EmailModal from './EmailModal';
 
 const ProjectsView = () => {
   const { projects, users, budgetCodes, budgetEntries, deleteProject, divisions, units } = useApp();
-  const { currentUser } = useAuth();
+  const { allowed: isSA } = useIsSuperAdmin();
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
@@ -98,9 +98,7 @@ const ProjectsView = () => {
   };
 
   const handleDelete = (project: Project) => {
-    const isSuperAdmin = currentUser?.role === 'super_admin';
-    const isAdmin = currentUser?.role === 'admin';
-    const canDelete = !!currentUser && (isSuperAdmin || (isAdmin && project.createdBy === currentUser.id));
+    const canDelete = !!isSA;
     if (!canDelete) return;
     if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
       deleteProject(project.id);
@@ -252,13 +250,9 @@ const ProjectsView = () => {
                         e.stopPropagation();
                         handleDelete(project);
                       }}
-                      className={`p-1 ${
-                        currentUser && (currentUser.role === 'super_admin' || (currentUser.role === 'admin' && project.createdBy === currentUser.id))
-                          ? 'text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400'
-                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-                      }`}
+                      className={`p-1 ${isSA ? 'text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'}`}
                       title="Delete Project"
-                      disabled={!(currentUser && (currentUser.role === 'super_admin' || (currentUser.role === 'admin' && project.createdBy === currentUser.id)))}
+                      disabled={!isSA}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
