@@ -463,6 +463,8 @@ export const budgetEntryService = {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      console.log('[DEBUG] budget_entries.getAll rows:', data?.length);
+      if (data?.length) console.log('[DEBUG] sample entry:', data[0]);
       return data.map(transformBudgetEntry);
     }
     
