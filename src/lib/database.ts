@@ -235,7 +235,7 @@ export const budgetCodeService = {
   
     if (error) throw error;
     return transformBudgetCode(data);
-  }
+  },
 
   async update(id: string, updates: Partial<BudgetCode>): Promise<BudgetCode> {
     if (useServerDb) {
