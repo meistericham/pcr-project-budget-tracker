@@ -7,11 +7,25 @@ import {
   notificationService,
   dbCreateDivision,
   dbListDivisions,
-  dbCreateUnit,        
-  dbListUnits          
+  dbCreateUnit,
+  dbListUnits,
+  dbDeleteDivision,
+  dbDeleteUnit,
+  dbUpdateUnit,
+  dbUpdateDivision,
 } from '../lib/database';
 import { useAuth } from './AuthContext';
-import { User, Project, BudgetEntry, BudgetCode, ViewMode, AppSettings, Notification, Division, Unit } from '../types';
+import {
+  User,
+  Project,
+  BudgetEntry,
+  BudgetCode,
+  ViewMode,
+  AppSettings,
+  Notification,
+  Division,
+  Unit,
+} from '../types';
 
 interface AppContextType {
   users: User[];
@@ -25,30 +39,49 @@ interface AppContextType {
   currentView: ViewMode;
   selectedProject: Project | null;
   sidebarCollapsed: boolean;
+
   setCurrentView: (view: ViewMode) => void;
   setSelectedProject: (project: Project | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  addDivision: (division: Omit<Division, 'id' | 'createdAt'>) => void;
+
+  // Divisions
+  addDivision: (division: Omit<Division, 'id' | 'createdAt'>) => Promise<Division> | void;
   updateDivision: (id: string, updates: Partial<Division>) => void;
-  deleteDivision: (id: string) => void;
-  addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => void;
+  deleteDivision: (id: string) => Promise<void>;
+  renameDivision: (id: string, newName: string) => Promise<any> | void;
+
+  // Units
+  addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => Promise<Unit> | void;
   updateUnit: (id: string, updates: Partial<Unit>) => void;
-  deleteUnit: (id: string) => void;
-  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateProject: (id: string, updates: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
-  addBudgetEntry: (entry: Omit<BudgetEntry, 'id' | 'createdAt'>) => void;
-  updateBudgetEntry: (id: string, updates: Partial<BudgetEntry>) => void;
-  deleteBudgetEntry: (id: string) => void;
-  addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
-  updateUser: (id: string, updates: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-  addBudgetCode: (code: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateBudgetCode: (id: string, updates: Partial<BudgetCode>) => void;
-  deleteBudgetCode: (id: string) => void;
-  toggleBudgetCodeStatus: (id: string) => void;
+  deleteUnit: (id: string) => Promise<void>;
+  renameUnit: (id: string, newName: string) => Promise<any> | void;
+
+  // Projects
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+
+  // Budget entries
+  addBudgetEntry: (entry: Omit<BudgetEntry, 'id' | 'createdAt'>) => Promise<void>;
+  updateBudgetEntry: (id: string, updates: Partial<BudgetEntry>) => Promise<void>;
+  deleteBudgetEntry: (id: string) => Promise<void>;
+
+  // Users
+  addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
+  updateUser: (id: string, updates: Partial<User>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+
+  // Budget codes
+  addBudgetCode: (code: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateBudgetCode: (id: string, updates: Partial<BudgetCode>) => Promise<void>;
+  deleteBudgetCode: (id: string) => Promise<void>;
+  toggleBudgetCodeStatus: (id: string) => Promise<void>;
+
+  // Settings
   updateSettings: (settings: Partial<AppSettings>) => void;
-  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
+
+  // Notifications
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   deleteNotification: (id: string) => void;
@@ -74,10 +107,10 @@ const STORAGE_KEYS = {
   BUDGET_ENTRIES: 'pcr_budget_entries',
   BUDGET_CODES: 'pcr_budget_codes',
   NOTIFICATIONS: 'pcr_notifications',
-  SETTINGS: 'pcr_settings'
+  SETTINGS: 'pcr_settings',
 };
 
-// Helper functions for localStorage
+// localStorage helpers
 const saveToStorage = (key: string, data: any) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
@@ -96,7 +129,7 @@ const loadFromStorage = (key: string, defaultValue: any) => {
   }
 };
 
-// Debounced save function
+// Debounced save
 const createDebouncedSave = (key: string) => {
   let timeoutId: NodeJS.Timeout;
   return (data: any) => {
@@ -110,27 +143,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentView, setCurrentView] = useState<ViewMode>('projects');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Feature flag: server mode
   const useServerDb = import.meta.env.VITE_USE_SERVER_DB === 'true';
-// TEMP DIAGNOSTIC (explicit values)
-console.log(
-  '[DB_MODE] raw=',
-  import.meta.env.VITE_USE_SERVER_DB,
-  'computed=',
-  useServerDb
-);
-  // Create debounced save functions
+
+  // Debounced savers
   const debouncedSaveUsers = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.USERS), []);
   const debouncedSaveProjects = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.PROJECTS), []);
-  const debouncedSaveBudgetEntries = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.BUDGET_ENTRIES), []);
-  const debouncedSaveBudgetCodes = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.BUDGET_CODES), []);
-  const debouncedSaveNotifications = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.NOTIFICATIONS), []);
-  const debouncedSaveSettings = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.SETTINGS), []);
+  const debouncedSaveBudgetEntries = React.useMemo(
+    () => createDebouncedSave(STORAGE_KEYS.BUDGET_ENTRIES),
+    [],
+  );
+  const debouncedSaveBudgetCodes = React.useMemo(
+    () => createDebouncedSave(STORAGE_KEYS.BUDGET_CODES),
+    [],
+  );
+  const debouncedSaveNotifications = React.useMemo(
+    () => createDebouncedSave(STORAGE_KEYS.NOTIFICATIONS),
+    [],
+  );
+  const debouncedSaveSettings = React.useMemo(
+    () => createDebouncedSave(STORAGE_KEYS.SETTINGS),
+    [],
+  );
 
   // Default settings
   const defaultSettings: AppSettings = {
     currency: 'MYR',
     dateFormat: 'DD/MM/YYYY',
-    fiscalYearStart: 1, // January
+    fiscalYearStart: 1,
     budgetAlertThreshold: 80,
     autoBackup: true,
     emailNotifications: true,
@@ -138,48 +179,28 @@ console.log(
     defaultProjectStatus: 'planning',
     defaultProjectPriority: 'medium',
     budgetCategories: [
-      'Design', 'Development', 'Marketing', 'Software', 'Research',
-      'Advertising', 'Equipment', 'Travel', 'Training', 'Other'
+      'Design',
+      'Development',
+      'Marketing',
+      'Software',
+      'Research',
+      'Advertising',
+      'Equipment',
+      'Travel',
+      'Training',
+      'Other',
     ],
     maxProjectDuration: 365,
     requireBudgetApproval: false,
-    allowNegativeBudget: false
+    allowNegativeBudget: false,
   };
 
-  // Default initial data
+  // Default seed data
   const defaultUsers: User[] = [
-    {
-      id: '1',
-      name: 'Hisyamudin',
-      email: 'hisyamudin@sarawaktourism.com',
-      role: 'super_admin',
-      initials: 'HS',
-      createdAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '2',
-      name: 'John Doe',
-      email: 'john@company.com',
-      role: 'super_admin',
-      initials: 'JD',
-      createdAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '3',
-      name: 'Sarah Chen',
-      email: 'sarah@company.com',
-      role: 'admin',
-      initials: 'SC',
-      createdAt: '2024-01-02T00:00:00Z'
-    },
-    {
-      id: '4',
-      name: 'Mike Johnson',
-      email: 'mike@company.com',
-      role: 'user',
-      initials: 'MJ',
-      createdAt: '2024-01-03T00:00:00Z'
-    }
+    { id: '1', name: 'Hisyamudin', email: 'hisyamudin@sarawaktourism.com', role: 'super_admin', initials: 'HS', createdAt: '2024-01-01T00:00:00Z' },
+    { id: '2', name: 'John Doe', email: 'john@company.com', role: 'super_admin', initials: 'JD', createdAt: '2024-01-01T00:00:00Z' },
+    { id: '3', name: 'Sarah Chen', email: 'sarah@company.com', role: 'admin', initials: 'SC', createdAt: '2024-01-02T00:00:00Z' },
+    { id: '4', name: 'Mike Johnson', email: 'mike@company.com', role: 'user', initials: 'MJ', createdAt: '2024-01-03T00:00:00Z' },
   ];
 
   const defaultBudgetCodes: BudgetCode[] = [
@@ -187,50 +208,54 @@ console.log(
       id: '1',
       code: '1-2345',
       name: 'Software Development',
-      description: 'Budget allocation for software development activities including coding, testing, and deployment',
+      description:
+        'Budget allocation for software development activities including coding, testing, and deployment',
       budget: 500000,
       spent: 74000,
       isActive: true,
       createdBy: '1',
       createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
+      updatedAt: '2024-01-01T00:00:00Z',
     },
     {
       id: '2',
       code: '2-1001',
       name: 'Marketing & Advertising',
-      description: 'Budget for marketing campaigns, advertising, and promotional activities',
+      description:
+        'Budget for marketing campaigns, advertising, and promotional activities',
       budget: 300000,
       spent: 99200,
       isActive: true,
       createdBy: '1',
       createdAt: '2024-01-02T00:00:00Z',
-      updatedAt: '2024-01-02T00:00:00Z'
+      updatedAt: '2024-01-02T00:00:00Z',
     },
     {
       id: '3',
       code: '3-5678',
       name: 'Equipment & Hardware',
-      description: 'Purchase and maintenance of equipment, hardware, and infrastructure',
+      description:
+        'Purchase and maintenance of equipment, hardware, and infrastructure',
       budget: 150000,
       spent: 0,
       isActive: true,
       createdBy: '2',
       createdAt: '2024-01-03T00:00:00Z',
-      updatedAt: '2024-01-03T00:00:00Z'
+      updatedAt: '2024-01-03T00:00:00Z',
     },
     {
       id: '4',
       code: '4-9999',
       name: 'Training & Development',
-      description: 'Employee training, workshops, and professional development programs',
+      description:
+        'Employee training, workshops, and professional development programs',
       budget: 75000,
       spent: 0,
       isActive: false,
       createdBy: '1',
       createdAt: '2024-01-04T00:00:00Z',
-      updatedAt: '2024-01-04T00:00:00Z'
-    }
+      updatedAt: '2024-01-04T00:00:00Z',
+    },
   ];
 
   const defaultProjects: Project[] = [
@@ -249,7 +274,7 @@ console.log(
       budgetCodes: ['1', '2'],
       createdBy: '1',
       createdAt: '2024-01-10T00:00:00Z',
-      updatedAt: '2024-01-10T00:00:00Z'
+      updatedAt: '2024-01-10T00:00:00Z',
     },
     {
       id: '2',
@@ -266,7 +291,7 @@ console.log(
       budgetCodes: ['1', '3'],
       createdBy: '1',
       createdAt: '2024-01-20T00:00:00Z',
-      updatedAt: '2024-01-20T00:00:00Z'
+      updatedAt: '2024-01-20T00:00:00Z',
     },
     {
       id: '3',
@@ -283,8 +308,8 @@ console.log(
       budgetCodes: ['2'],
       createdBy: '1',
       createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    }
+      updatedAt: '2024-01-01T00:00:00Z',
+    },
   ];
 
   const defaultBudgetEntries: BudgetEntry[] = [
@@ -300,7 +325,7 @@ console.log(
       category: 'Design',
       date: '2024-01-20',
       createdBy: '1',
-      createdAt: '2024-01-20T00:00:00Z'
+      createdAt: '2024-01-20T00:00:00Z',
     },
     {
       id: '2',
@@ -314,7 +339,7 @@ console.log(
       category: 'Software',
       date: '2024-01-25',
       createdBy: '2',
-      createdAt: '2024-01-25T00:00:00Z'
+      createdAt: '2024-01-25T00:00:00Z',
     },
     {
       id: '3',
@@ -328,7 +353,7 @@ console.log(
       category: 'Research',
       date: '2024-01-30',
       createdBy: '1',
-      createdAt: '2024-01-30T00:00:00Z'
+      createdAt: '2024-01-30T00:00:00Z',
     },
     {
       id: '4',
@@ -342,7 +367,7 @@ console.log(
       category: 'Advertising',
       date: '2024-02-01',
       createdBy: '2',
-      createdAt: '2024-02-01T00:00:00Z'
+      createdAt: '2024-02-01T00:00:00Z',
     },
     {
       id: '5',
@@ -356,7 +381,7 @@ console.log(
       category: 'Development',
       date: '2024-02-15',
       createdBy: '3',
-      createdAt: '2024-02-15T00:00:00Z'
+      createdAt: '2024-02-15T00:00:00Z',
     },
     {
       id: '6',
@@ -370,7 +395,7 @@ console.log(
       category: 'Marketing',
       date: '2024-03-01',
       createdBy: '2',
-      createdAt: '2024-03-01T00:00:00Z'
+      createdAt: '2024-03-01T00:00:00Z',
     },
     {
       id: '7',
@@ -384,110 +409,102 @@ console.log(
       category: 'Marketing',
       date: '2024-03-15',
       createdBy: '2',
-      createdAt: '2024-03-15T00:00:00Z'
-    }
+      createdAt: '2024-03-15T00:00:00Z',
+    },
   ];
 
   const defaultDivisions: Division[] = [
     { id: 'd1', name: 'Corporate Services', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' },
-    { id: 'd2', name: 'Marketing', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' }
+    { id: 'd2', name: 'Marketing', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' },
   ];
 
   const defaultUnits: Unit[] = [
     { id: 'u1', name: 'IT Unit', divisionId: 'd1', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' },
     { id: 'u2', name: 'Product Unit', divisionId: 'd1', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' },
-    { id: 'u3', name: 'Digital Marketing Unit', divisionId: 'd2', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' }
+    { id: 'u3', name: 'Digital Marketing Unit', divisionId: 'd2', createdBy: '1', createdAt: '2024-01-01T00:00:00Z' },
   ];
 
-  // Initialize state with persistent data - skip defaults in server mode
-  const [settings, setSettings] = useState<AppSettings>(() => 
-    useServerDb ? defaultSettings : loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings)
+  // State (server mode starts empty)
+  const [settings, setSettings] = useState<AppSettings>(() =>
+    useServerDb ? defaultSettings : loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings),
   );
-
-  const [users, setUsers] = useState<User[]>(() => 
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.USERS, defaultUsers)
+  const [users, setUsers] = useState<User[]>(() =>
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.USERS, defaultUsers),
   );
-
-  const [budgetCodes, setBudgetCodes] = useState<BudgetCode[]>(() => 
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_CODES, defaultBudgetCodes)
+  const [budgetCodes, setBudgetCodes] = useState<BudgetCode[]>(() =>
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_CODES, defaultBudgetCodes),
   );
-
   const [divisions, setDivisions] = useState<Division[]>(() =>
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.DIVISIONS, defaultDivisions)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.DIVISIONS, defaultDivisions),
   );
-// Server mode: load divisions from Supabase on mount
-useEffect(() => {
-  if (!useServerDb) return;
-  (async () => {
-    try {
-      const rows = await dbListDivisions();
-      const mapped = rows.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        // keep code if your Division type has it
-        ...(r.code ? { code: r.code } : {}),
-        createdAt: r.created_at,
-        createdBy: '',
-      }));
-      setDivisions(mapped);
-    } catch (e) {
-      console.error('Load divisions failed:', e);
-    }
-  })();
-}, [useServerDb]);
-
   const [units, setUnits] = useState<Unit[]>(() =>
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits)
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits),
   );
-// Server mode: load units from Supabase on mount
-useEffect(() => {
-  if (!useServerDb) return;
-  (async () => {
-    try {
-      const rows = await dbListUnits();
-      const mapped = rows.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        ...(r.code ? { code: r.code } : {}),
-        divisionId: r.division_id,   // snake_case → camelCase
-        createdAt: r.created_at,
-        createdBy: '',
-      }));
-      setUnits(mapped);
-    } catch (e) {
-      console.error('Load units failed:', e);
-    }
-  })();
-}, [useServerDb]);
-
-  const [projects, setProjects] = useState<Project[]>(() => 
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.PROJECTS, defaultProjects)
+  const [projects, setProjects] = useState<Project[]>(() =>
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.PROJECTS, defaultProjects),
+  );
+  const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>(() =>
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_ENTRIES, defaultBudgetEntries),
+  );
+  const [notifications, setNotifications] = useState<Notification[]>(() =>
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, []),
   );
 
-  const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>(() => 
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_ENTRIES, defaultBudgetEntries)
-  );
-
-  const [notifications, setNotifications] = useState<Notification[]>(() => 
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, [])
-  );
-
-  // Optional server hydration
+  // Load divisions (server)
   useEffect(() => {
     if (!useServerDb) return;
-    
+    (async () => {
+      try {
+        const rows = await dbListDivisions();
+        const mapped = rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          ...(r.code ? { code: r.code } : {}),
+          createdAt: r.created_at,
+          createdBy: r.created_by || '',
+        }));
+        setDivisions(mapped);
+      } catch (e) {
+        console.error('Load divisions failed:', e);
+      }
+    })();
+  }, [useServerDb]);
+
+  // Load units (server)
+  useEffect(() => {
+    if (!useServerDb) return;
+    (async () => {
+      try {
+        const rows = await dbListUnits();
+        const mapped = rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          ...(r.code ? { code: r.code } : {}),
+          divisionId: r.division_id,
+          createdAt: r.created_at,
+          createdBy: r.created_by || '',
+        }));
+        setUnits(mapped);
+      } catch (e) {
+        console.error('Load units failed:', e);
+      }
+    })();
+  }, [useServerDb]);
+
+  // Hydrate other server data
+  useEffect(() => {
+    if (!useServerDb) return;
     let cancelled = false;
     (async () => {
       try {
-        if (import.meta.env.DEV) console.log('[CTX] hydrate from supabase');
-        const [remoteUsers, remoteCodes, remoteProjects, remoteEntries, remoteNotifs] = await Promise.all([
-          userService.getAll().catch(() => users),
-          budgetCodeService.getAll().catch(() => budgetCodes),
-          projectService.getAll().catch(() => projects),
-          budgetEntryService.getAll().catch(() => budgetEntries),
-          notificationService.getAll().catch(() => notifications)
-        ]);
-        
+        const [remoteUsers, remoteCodes, remoteProjects, remoteEntries, remoteNotifs] =
+          await Promise.all([
+            userService.getAll().catch(() => users),
+            budgetCodeService.getAll().catch(() => budgetCodes),
+            projectService.getAll().catch(() => projects),
+            budgetEntryService.getAll().catch(() => budgetEntries),
+            notificationService.getAll().catch(() => notifications),
+          ]);
         if (!cancelled) {
           setUsers(remoteUsers);
           setBudgetCodes(remoteCodes);
@@ -497,199 +514,224 @@ useEffect(() => {
         }
       } catch (e) {
         console.error('[CTX] hydrate error', e);
-        // Fallback to existing local data on error
       }
     })();
-    
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save to localStorage whenever state changes (optimized with debouncing) - only when not using server
+  // Persist to localStorage in non-server mode
   useEffect(() => {
-    if (!useServerDb) {
-      debouncedSaveUsers(users);
-    }
+    if (!useServerDb) debouncedSaveUsers(users);
   }, [users, debouncedSaveUsers, useServerDb]);
-
   useEffect(() => {
-    if (!useServerDb) {
-      debouncedSaveProjects(projects);
-    }
+    if (!useServerDb) debouncedSaveProjects(projects);
   }, [projects, debouncedSaveProjects, useServerDb]);
-
   useEffect(() => {
-    if (!useServerDb) {
-      debouncedSaveBudgetEntries(budgetEntries);
-    }
+    if (!useServerDb) debouncedSaveBudgetEntries(budgetEntries);
   }, [budgetEntries, debouncedSaveBudgetEntries, useServerDb]);
-
   useEffect(() => {
-    if (!useServerDb) {
-      debouncedSaveBudgetCodes(budgetCodes);
-    }
+    if (!useServerDb) debouncedSaveBudgetCodes(budgetCodes);
   }, [budgetCodes, debouncedSaveBudgetCodes, useServerDb]);
-
   useEffect(() => {
-    if (!useServerDb) {
-      saveToStorage(STORAGE_KEYS.DIVISIONS, divisions);
-    }
+    if (!useServerDb) saveToStorage(STORAGE_KEYS.DIVISIONS, divisions);
   }, [divisions, useServerDb]);
-
   useEffect(() => {
-    if (!useServerDb) {
-      saveToStorage(STORAGE_KEYS.UNITS, units);
-    }
+    if (!useServerDb) saveToStorage(STORAGE_KEYS.UNITS, units);
   }, [units, useServerDb]);
-  const addDivision = (divisionData: Omit<Division, 'id' | 'createdAt'>) => {
+  useEffect(() => {
+    debouncedSaveNotifications(notifications);
+  }, [notifications, debouncedSaveNotifications]);
+  useEffect(() => {
+    debouncedSaveSettings(settings);
+  }, [settings, debouncedSaveSettings]);
+
+  // ----- Division CRUD -----
+  const addDivision = async (
+    divisionData: Omit<Division, 'id' | 'createdAt'>,
+  ): Promise<Division> => {
     if (useServerDb) {
-      dbCreateDivision({
-        // if your UI doesn’t provide `code`, we’ll fallback to using the name
+      const row = await dbCreateDivision({
         code: (divisionData as any).code ?? divisionData.name,
         name: divisionData.name,
-      })
-        .then((row: any) => {
-          const newDivision: Division = {
-            id: row.id,
-            name: row.name,
-            ...(row.code ? { code: row.code } : {}),
-            createdAt: row.created_at,
-            createdBy: (divisionData as any).createdBy ?? '',
-          };
-          setDivisions(prev => [...prev, newDivision]);
-        })
-        .catch(err => {
-          console.error('Create division (Supabase) failed:', err);
-        });
-      return;
+      });
+      const newDivision: Division = {
+        id: row.id,
+        name: row.name,
+        ...(row.code ? { code: row.code } : {}),
+        createdAt: row.created_at,
+        createdBy: (divisionData as any).createdBy ?? '',
+      };
+      setDivisions(prev => [...prev, newDivision]);
+      return newDivision;
     }
-  
-    // === Local storage fallback (unchanged) ===
     const newDivision: Division = {
       ...divisionData,
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     };
     setDivisions(prev => [...prev, newDivision]);
+    return newDivision;
   };
 
   const updateDivision = (id: string, updates: Partial<Division>) => {
     setDivisions(prev => prev.map(d => (d.id === id ? { ...d, ...updates } : d)));
   };
 
-  const deleteDivision = (id: string) => {
-    setDivisions(prev => prev.filter(d => d.id !== id));
-    // Cascade: remove units under this division and unlink from projects/entries
-    const unitIds = units.filter(u => u.divisionId === id).map(u => u.id);
-    setUnits(prev => prev.filter(u => u.divisionId !== id));
-    setProjects(prev => prev.map(p => (unitIds.includes(p.unitId) ? { ...p, unitId: '' } : p)));
-    setBudgetEntries(prev => prev.map(e => (e.divisionId === id ? { ...e, divisionId: undefined } : e)));
+  const deleteDivision = async (divisionId: string) => {
+    // collect affected units once
+    const unitsInDiv = units.filter(u => u.divisionId === divisionId);
+    const unitIdsInDiv = unitsInDiv.map(u => u.id);
+
+    if (useServerDb) {
+      try {
+        if (unitsInDiv.length) {
+          await Promise.all(unitsInDiv.map(u => dbDeleteUnit(u.id)));
+        }
+        await dbDeleteDivision(divisionId);
+      } catch (e) {
+        console.error('Delete division (Supabase) failed:', e);
+        throw e;
+      }
+    }
+
+    // UI cascade
+    setUnits(prev => prev.filter(u => u.divisionId !== divisionId));
+    setProjects(prev => prev.map(p => (unitIdsInDiv.includes(p.unitId) ? { ...p, unitId: '' } : p)));
+    setBudgetEntries(prev =>
+      prev.map(e => {
+        const clearDivision = e.divisionId === divisionId;
+        const clearUnit = e.unitId && unitIdsInDiv.includes(e.unitId);
+        if (!clearDivision && !clearUnit) return e;
+        return {
+          ...e,
+          ...(clearDivision ? { divisionId: undefined } : {}),
+          ...(clearUnit ? { unitId: undefined } : {}),
+        };
+      }),
+    );
+    setDivisions(prev => prev.filter(d => d.id !== divisionId));
   };
 
-  const addUnit = (unitData: Omit<Unit, 'id' | 'createdAt'>) => {
+  const renameDivision = async (id: string, newName: string) => {
     if (useServerDb) {
-      const divisionId = (unitData as any).divisionId;
-      if (!divisionId) {
-        console.error('Create unit failed: divisionId is required in server mode');
-        return;
+      try {
+        const row = await dbUpdateDivision(id, { name: newName });
+        setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name: row.name } : d)));
+        return row;
+      } catch (err) {
+        console.error('Rename division failed:', err);
+        throw err;
       }
-      dbCreateUnit({
-        division_id: divisionId,                       // DB column
-        code: (unitData as any).code ?? unitData.name, // fallback if no code input
-        name: unitData.name,
-      })
-        .then((row: any) => {
-          const newUnit: Unit = {
-            id: row.id,
-            name: row.name,
-            ...(row.code ? { code: row.code } : {}),
-            divisionId: row.division_id,               // map snake_case → camelCase
-            createdAt: row.created_at,
-            createdBy: (unitData as any).createdBy ?? '',
-          };
-          setUnits(prev => [...prev, newUnit]);
-        })
-        .catch(err => {
-          console.error('Create unit (Supabase) failed:', err);
-        });
-      return;
+    } else {
+      setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name: newName } : d)));
     }
-  
-    // === Local storage fallback (unchanged) ===
+  };
+
+  // ----- Unit CRUD -----
+  const addUnit = async (unitData: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit> => {
+    if (useServerDb) {
+      const row = await dbCreateUnit({
+        division_id: unitData.divisionId,
+        code: (unitData as any).code ?? unitData.name,
+        name: unitData.name,
+      });
+      const newUnit: Unit = {
+        id: row.id,
+        name: row.name,
+        ...(row.code ? { code: row.code } : {}),
+        divisionId: row.division_id,
+        createdAt: row.created_at,
+        createdBy: (unitData as any).createdBy ?? '',
+      };
+      setUnits(prev => [...prev, newUnit]);
+      return newUnit;
+    }
     const newUnit: Unit = {
       ...unitData,
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     };
     setUnits(prev => [...prev, newUnit]);
+    return newUnit;
   };
 
   const updateUnit = (id: string, updates: Partial<Unit>) => {
     setUnits(prev => prev.map(u => (u.id === id ? { ...u, ...updates } : u)));
   };
 
-  const deleteUnit = (id: string) => {
+  const deleteUnit = async (id: string) => {
+    if (useServerDb) {
+      try {
+        await dbDeleteUnit(id);
+      } catch (e) {
+        console.error('Delete unit (Supabase) failed:', e);
+        throw e;
+      }
+    }
+    // UI cascade
     setUnits(prev => prev.filter(u => u.id !== id));
     setProjects(prev => prev.map(p => (p.unitId === id ? { ...p, unitId: '' } : p)));
     setBudgetEntries(prev => prev.map(e => (e.unitId === id ? { ...e, unitId: undefined } : e)));
   };
 
-  useEffect(() => {
-    debouncedSaveNotifications(notifications);
-  }, [notifications, debouncedSaveNotifications]);
+  const renameUnit = async (id: string, newName: string) => {
+    if (useServerDb) {
+      try {
+        const row = await dbUpdateUnit(id, { name: newName });
+        setUnits(prev => prev.map(u => (u.id === id ? { ...u, name: row.name } : u)));
+        return row;
+      } catch (err) {
+        console.error('Rename unit failed:', err);
+        throw err;
+      }
+    } else {
+      setUnits(prev => prev.map(u => (u.id === id ? { ...u, name: newName } : u)));
+    }
+  };
 
-  useEffect(() => {
-    debouncedSaveSettings(settings);
-  }, [settings, debouncedSaveSettings]);
-
-  // Notification functions
+  // ----- Notifications helpers -----
   const addNotification = async (notificationData: Omit<Notification, 'id' | 'createdAt'>) => {
     let newNotification: Notification;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] addNotification → service');
       newNotification = await notificationService.create(notificationData);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] addNotification → local');
-      newNotification = { ...notificationData, id: Date.now().toString(), createdAt: new Date().toISOString() } as Notification;
+      newNotification = {
+        ...notificationData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      } as Notification;
     }
     setNotifications(prev => {
       const updated = [newNotification, ...prev];
-      // Keep only last 100 notifications to prevent storage bloat
       return updated.slice(0, 100);
     });
   };
 
   const markNotificationAsRead = (id: string) => {
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] markNotificationAsRead → service');
       notificationService.markAsRead(id).catch(console.error);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] markNotificationAsRead → local');
     }
-    setNotifications(prev => prev.map(notification => 
-      notification.id === id ? { ...notification, read: true } : notification
-    ));
+    setNotifications(prev =>
+      prev.map(notification => (notification.id === id ? { ...notification, read: true } : notification)),
+    );
   };
 
   const markAllNotificationsAsRead = () => {
     if (!user) return;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] markAllNotificationsAsRead → service');
       notificationService.markAllAsRead(user.id).catch(console.error);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] markAllNotificationsAsRead → local');
     }
-    setNotifications(prev => prev.map(notification => 
-      notification.userId === user.id ? { ...notification, read: true } : notification
-    ));
+    setNotifications(prev =>
+      prev.map(notification => (notification.userId === user.id ? { ...notification, read: true } : notification)),
+    );
   };
 
   const deleteNotification = (id: string) => {
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] deleteNotification → service');
       notificationService.delete(id).catch(console.error);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] deleteNotification → local');
     }
     setNotifications(prev => prev.filter(notification => notification.id !== id));
   };
@@ -699,35 +741,13 @@ useEffect(() => {
     return notifications.filter(n => !n.read && n.userId === user.id).length;
   };
 
-  // Helper function to create notifications for all users
-  const notifyAllUsers = (
-    type: Notification['type'],
-    title: string,
-    message: string,
-    data?: any,
-    excludeUserId?: string
-  ) => {
-    users.forEach(user => {
-      if (user.id !== excludeUserId) {
-        addNotification({
-          userId: user.id,
-          type,
-          title,
-          message,
-          data,
-          read: false
-        });
-      }
-    });
-  };
-
-  // Helper function to notify specific users
+  // ----- Budget code alert helper -----
   const notifyUsers = (
     userIds: string[],
     type: Notification['type'],
     title: string,
     message: string,
-    data?: any
+    data?: any,
   ) => {
     userIds.forEach(userId => {
       addNotification({
@@ -736,61 +756,84 @@ useEffect(() => {
         title,
         message,
         data,
-        read: false
+        read: false,
       });
     });
   };
 
-  // Helper function to check budget code alerts
+  const notifyAllUsers = (
+    type: Notification['type'],
+    title: string,
+    message: string,
+    data?: any,
+    excludeUserId?: string,
+  ) => {
+    users.forEach(u => {
+      if (u.id !== excludeUserId) {
+        addNotification({
+          userId: u.id,
+          type,
+          title,
+          message,
+          data,
+          read: false,
+        });
+      }
+    });
+  };
+
   const checkBudgetCodeAlert = (budgetCodeId: string) => {
     const budgetCode = budgetCodes.find(bc => bc.id === budgetCodeId);
     if (!budgetCode) return;
-
     const usagePercentage = (budgetCode.spent / budgetCode.budget) * 100;
     if (usagePercentage >= settings.budgetAlertThreshold) {
       notifyAllUsers(
         'budget_code_alert',
         'Budget Code Alert',
-        `Budget code "${budgetCode.code} - ${budgetCode.name}" has used ${usagePercentage.toFixed(1)}% of its allocated budget`,
-        { 
+        `Budget code "${budgetCode.code} - ${budgetCode.name}" has used ${usagePercentage.toFixed(
+          1,
+        )}% of its allocated budget`,
+        {
           budgetCodeId: budgetCode.id,
           percentage: usagePercentage,
           budget: budgetCode.budget,
-          spent: budgetCode.spent
-        }
+          spent: budgetCode.spent,
+        },
       );
     }
   };
 
+  // ----- Projects -----
   const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     let newProject: Project;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] addProject → service');
       newProject = await projectService.create(projectData);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] addProject → local');
-      newProject = { ...projectData, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Project;
+      newProject = {
+        ...projectData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Project;
     }
     setProjects(prev => [...prev, newProject]);
 
-    // Notify all users about new project
     const creatorName = users.find(u => u.id === projectData.createdBy)?.name || 'Someone';
     notifyAllUsers(
       'project_created',
       'New Project Created',
       `${creatorName} created a new project: ${newProject.name}`,
       { projectId: newProject.id, createdBy: projectData.createdBy },
-      projectData.createdBy
+      projectData.createdBy,
     );
 
-    // Notify assigned users specifically
     if (projectData.assignedUsers.length > 0) {
       notifyUsers(
         projectData.assignedUsers,
         'user_assigned',
         'Project Assignment',
         `You have been assigned to the project: ${newProject.name}`,
-        { projectId: newProject.id }
+        { projectId: newProject.id },
       );
     }
   };
@@ -801,68 +844,55 @@ useEffect(() => {
 
     let updatedProject: Project;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] updateProject → service');
       updatedProject = await projectService.update(id, updates);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] updateProject → local');
       updatedProject = { ...oldProject, ...updates, updatedAt: new Date().toISOString() } as Project;
     }
-    setProjects(prev => prev.map(project => 
-      project.id === id ? updatedProject : project
-    ));
+    setProjects(prev => prev.map(project => (project.id === id ? updatedProject : project)));
 
-    // Notify all users about project update
     const updaterName = profile?.name || 'Someone';
     notifyAllUsers(
       'project_updated',
       'Project Updated',
       `${updaterName} updated the project: ${updatedProject.name}`,
-      { 
-        projectId: id, 
+      {
+        projectId: id,
         updatedBy: user?.id,
-        changes: Object.keys(updates)
+        changes: Object.keys(updates),
       },
-      user?.id
+      user?.id,
     );
 
-    // Check for budget alerts
     const budgetUsagePercentage = (updatedProject.spent / updatedProject.budget) * 100;
     if (budgetUsagePercentage >= settings.budgetAlertThreshold) {
       notifyAllUsers(
         'budget_alert',
         'Budget Alert',
         `Project "${updatedProject.name}" has used ${budgetUsagePercentage.toFixed(1)}% of its budget`,
-        { 
-          projectId: id, 
+        {
+          projectId: id,
           percentage: budgetUsagePercentage,
           budget: updatedProject.budget,
-          spent: updatedProject.spent
-        }
+          spent: updatedProject.spent,
+        },
       );
     }
 
-    // Notify if project status changed to completed
     if (updates.status === 'completed' && oldProject.status !== 'completed') {
-      notifyAllUsers(
-        'project_completed',
-        'Project Completed',
-        `Project "${updatedProject.name}" has been marked as completed`,
-        { projectId: id }
-      );
+      notifyAllUsers('project_completed', 'Project Completed', `Project "${updatedProject.name}" has been marked as completed`, {
+        projectId: id,
+      });
     }
 
-    // Notify newly assigned users
     if (updates.assignedUsers) {
-      const newlyAssigned = updates.assignedUsers.filter(userId => 
-        !oldProject.assignedUsers.includes(userId)
-      );
+      const newlyAssigned = updates.assignedUsers.filter(userId => !oldProject.assignedUsers.includes(userId));
       if (newlyAssigned.length > 0) {
         notifyUsers(
           newlyAssigned,
           'user_assigned',
           'Project Assignment',
           `You have been assigned to the project: ${updatedProject.name}`,
-          { projectId: id }
+          { projectId: id },
         );
       }
     }
@@ -871,83 +901,78 @@ useEffect(() => {
   const deleteProject = async (id: string) => {
     const project = projects.find(p => p.id === id);
     if (!project) return;
-    // Authorization: only super admins can delete any project; admins can delete projects they created; users cannot delete
+
     const isSuperAdmin = profile?.role === 'super_admin';
     const isAdmin = profile?.role === 'admin';
     const canDelete = !!user && (isSuperAdmin || (isAdmin && project.createdBy === user.id));
-    if (!canDelete) {
-      // Silently ignore or log; optional: add a notification later
-      return;
-    }
-    
+    if (!canDelete) return;
+
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] deleteProject → service');
       await projectService.delete(id);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] deleteProject → local');
     }
-    setProjects(prev => prev.filter(project => project.id !== id));
+    setProjects(prev => prev.filter(p => p.id !== id));
     setBudgetEntries(prev => prev.filter(entry => entry.projectId !== id));
 
-    // Notify all users about project deletion
     const deleterName = profile?.name || 'Someone';
     notifyAllUsers(
       'project_updated',
       'Project Deleted',
       `${deleterName} deleted the project: ${project.name}`,
       { projectId: id, deletedBy: user?.id },
-      user?.id
+      user?.id,
     );
   };
 
+  // ----- Budget entries -----
   const addBudgetEntry = async (entryData: Omit<BudgetEntry, 'id' | 'createdAt'>) => {
     let newEntry: BudgetEntry;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] addBudgetEntry → service');
       newEntry = await budgetEntryService.create(entryData);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] addBudgetEntry → local');
-      newEntry = { ...entryData, unitId: entryData.unitId ?? projects.find(p => p.id === entryData.projectId)?.unitId, divisionId: entryData.divisionId ?? units.find(u => u.id === (projects.find(p => p.id === entryData.projectId)?.unitId || ''))?.divisionId, id: Date.now().toString(), createdAt: new Date().toISOString() } as BudgetEntry;
+      newEntry = {
+        ...entryData,
+        unitId: entryData.unitId ?? projects.find(p => p.id === entryData.projectId)?.unitId,
+        divisionId:
+          entryData.divisionId ??
+          units.find(u => u.id === (projects.find(p => p.id === entryData.projectId)?.unitId || ''))?.divisionId,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      } as BudgetEntry;
     }
     setBudgetEntries(prev => [...prev, newEntry]);
-    
-    // Update project spent amount
+
     const project = projects.find(p => p.id === entryData.projectId);
     if (project && entryData.type === 'expense') {
       updateProject(project.id, { spent: project.spent + entryData.amount });
     }
 
-    // Update budget code spent amount
     if (entryData.budgetCodeId && entryData.type === 'expense') {
-      setBudgetCodes(prev => prev.map(code => 
-        code.id === entryData.budgetCodeId 
-          ? { ...code, spent: code.spent + entryData.amount, updatedAt: new Date().toISOString() }
-          : code
-      ));
-      
-      // Check for budget code alerts after updating
+      setBudgetCodes(prev =>
+        prev.map(code =>
+          code.id === entryData.budgetCodeId
+            ? { ...code, spent: code.spent + entryData.amount, updatedAt: new Date().toISOString() }
+            : code,
+        ),
+      );
       setTimeout(() => checkBudgetCodeAlert(entryData.budgetCodeId!), 100);
     }
 
-    // Notify project team about new budget entry
     if (project) {
       const creatorName = users.find(u => u.id === entryData.createdBy)?.name || 'Someone';
       const notificationMessage = `${creatorName} added a new ${entryData.type} of ${settings.currency} ${entryData.amount.toLocaleString()} to ${project.name}`;
-      
-      // Notify assigned users and project creator
       const usersToNotify = [...new Set([...project.assignedUsers, project.createdBy])];
       notifyUsers(
-        usersToNotify.filter(userId => userId !== entryData.createdBy),
+        usersToNotify.filter(uid => uid !== entryData.createdBy),
         'budget_entry_added',
         'New Budget Entry',
         notificationMessage,
-        { 
-          projectId: entryData.projectId, 
+        {
+          projectId: entryData.projectId,
           entryId: newEntry.id,
           amount: entryData.amount,
           type: entryData.type,
-          budgetCodeId: entryData.budgetCodeId
-        }
+          budgetCodeId: entryData.budgetCodeId,
+        },
       );
     }
   };
@@ -955,38 +980,38 @@ useEffect(() => {
   const updateBudgetEntry = async (id: string, updates: Partial<BudgetEntry>) => {
     const oldEntry = budgetEntries.find(e => e.id === id);
     if (!oldEntry) return;
-    
+
     let updated: BudgetEntry;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] updateBudgetEntry → service');
       updated = await budgetEntryService.update(id, updates);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] updateBudgetEntry → local');
       updated = { ...oldEntry, ...updates } as BudgetEntry;
     }
     setBudgetEntries(prev => prev.map(entry => (entry.id === id ? updated : entry)));
 
-    // Update budget code spent amounts if amount or budget code changed
     if (updates.amount !== undefined || updates.budgetCodeId !== undefined) {
-      // Remove from old budget code
       if (oldEntry.budgetCodeId && oldEntry.type === 'expense') {
-        setBudgetCodes(prev => prev.map(code => 
-          code.id === oldEntry.budgetCodeId 
-            ? { ...code, spent: Math.max(0, code.spent - oldEntry.amount), updatedAt: new Date().toISOString() }
-            : code
-        ));
+        setBudgetCodes(prev =>
+          prev.map(code =>
+            code.id === oldEntry.budgetCodeId
+              ? { ...code, spent: Math.max(0, code.spent - oldEntry.amount), updatedAt: new Date().toISOString() }
+              : code,
+          ),
+        );
       }
-      
-      // Add to new budget code
       const newBudgetCodeId = updates.budgetCodeId !== undefined ? updates.budgetCodeId : oldEntry.budgetCodeId;
       if (newBudgetCodeId && oldEntry.type === 'expense') {
-        setBudgetCodes(prev => prev.map(code => 
-          code.id === newBudgetCodeId 
-            ? { ...code, spent: code.spent + (updates.amount || oldEntry.amount), updatedAt: new Date().toISOString() }
-            : code
-        ));
-        
-        // Check for budget code alerts
+        setBudgetCodes(prev =>
+          prev.map(code =>
+            code.id === newBudgetCodeId
+              ? {
+                  ...code,
+                  spent: code.spent + (updates.amount || oldEntry.amount),
+                  updatedAt: new Date().toISOString(),
+                }
+              : code,
+          ),
+        );
         setTimeout(() => checkBudgetCodeAlert(newBudgetCodeId), 100);
       }
     }
@@ -995,45 +1020,39 @@ useEffect(() => {
   const deleteBudgetEntry = async (id: string) => {
     const entry = budgetEntries.find(e => e.id === id);
     if (!entry) return;
-    
+
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetEntry → service');
       await budgetEntryService.delete(id);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetEntry → local');
     }
-    // Update project spent amount
+
     if (entry.type === 'expense') {
       const project = projects.find(p => p.id === entry.projectId);
       if (project) {
         updateProject(project.id, { spent: project.spent - entry.amount });
       }
-      
-      // Update budget code spent amount
       if (entry.budgetCodeId) {
-        setBudgetCodes(prev => prev.map(code => 
-          code.id === entry.budgetCodeId 
-            ? { ...code, spent: Math.max(0, code.spent - entry.amount), updatedAt: new Date().toISOString() }
-            : code
-        ));
+        setBudgetCodes(prev =>
+          prev.map(code =>
+            code.id === entry.budgetCodeId
+              ? { ...code, spent: Math.max(0, code.spent - entry.amount), updatedAt: new Date().toISOString() }
+              : code,
+          ),
+        );
       }
     }
-    
-    setBudgetEntries(prev => prev.filter(entry => entry.id !== id));
+    setBudgetEntries(prev => prev.filter(e => e.id !== id));
   };
 
+  // ----- Users -----
   const addUser = async (userData: Omit<User, 'id' | 'createdAt'>) => {
     let newUser: User;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] addUser → service');
       newUser = await userService.create(userData);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] addUser → local');
       newUser = { ...userData, id: Date.now().toString(), createdAt: new Date().toISOString() } as User;
     }
     setUsers(prev => [...prev, newUser]);
 
-    // Notify all admins about new user
     const adminUsers = users.filter(u => u.role === 'admin' || u.role === 'super_admin');
     const creatorName = profile?.name || 'Someone';
     notifyUsers(
@@ -1041,47 +1060,46 @@ useEffect(() => {
       'user_assigned',
       'New User Added',
       `${creatorName} added a new user: ${newUser.name} (${newUser.role.replace('_', ' ')})`,
-      { userId: newUser.id }
+      { userId: newUser.id },
     );
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
     let next: User | undefined;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] updateUser → service');
       next = await userService.update(id, updates);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] updateUser → local');
       next = undefined;
     }
-    setUsers(prev => prev.map(user => (user.id === id ? (next || { ...user, ...updates }) : user)));
+    setUsers(prev => prev.map(u => (u.id === id ? (next || { ...u, ...updates }) : u)));
   };
 
   const deleteUser = async (id: string) => {
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] deleteUser → service');
       await userService.delete(id);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] deleteUser → local');
     }
-    setUsers(prev => prev.filter(user => user.id !== id));
-    // Also remove user from project assignments
-    setProjects(prev => prev.map(project => ({
-      ...project,
-      assignedUsers: project.assignedUsers.filter(userId => userId !== id)
-    })));
-    // Remove user's notifications
-    setNotifications(prev => prev.filter(notification => notification.userId !== id));
+    setUsers(prev => prev.filter(u => u.id !== id));
+    setProjects(prev =>
+      prev.map(project => ({
+        ...project,
+        assignedUsers: project.assignedUsers.filter(userId => userId !== id),
+      })),
+    );
+    setNotifications(prev => prev.filter(n => n.userId !== id));
   };
 
+  // ----- Budget codes -----
   const addBudgetCode = async (codeData: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>) => {
     let newCode: BudgetCode;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] addBudgetCode → service');
       newCode = await budgetCodeService.create(codeData);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] addBudgetCode → local');
-      newCode = { ...codeData, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as BudgetCode;
+      newCode = {
+        ...codeData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as BudgetCode;
     }
     setBudgetCodes(prev => [...prev, newCode]);
   };
@@ -1089,15 +1107,15 @@ useEffect(() => {
   const updateBudgetCode = async (id: string, updates: Partial<BudgetCode>) => {
     let next: BudgetCode | undefined;
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] updateBudgetCode → service');
       next = await budgetCodeService.update(id, updates);
     } else {
-      if (import.meta.env.DEV) console.log('[CTX] updateBudgetCode → local');
       next = undefined;
     }
-    setBudgetCodes(prev => prev.map(code => (code.id === id ? (next || { ...code, ...updates, updatedAt: new Date().toISOString() }) : code)));
-    
-    // Check for budget alerts if budget was changed
+    setBudgetCodes(prev =>
+      prev.map(code =>
+        code.id === id ? (next || { ...code, ...updates, updatedAt: new Date().toISOString() }) : code,
+      ),
+    );
     if (updates.budget !== undefined) {
       setTimeout(() => checkBudgetCodeAlert(id), 100);
     }
@@ -1105,95 +1123,92 @@ useEffect(() => {
 
   const deleteBudgetCode = async (id: string) => {
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetCode → service');
       await budgetCodeService.delete(id);
-    } else {
-      if (import.meta.env.DEV) console.log('[CTX] deleteBudgetCode → local');
     }
     setBudgetCodes(prev => prev.filter(code => code.id !== id));
-    // Remove budget code from projects
-    setProjects(prev => prev.map(project => ({
-      ...project,
-      budgetCodes: project.budgetCodes.filter(codeId => codeId !== id)
-    })));
-    // Remove budget code from entries
-    setBudgetEntries(prev => prev.map(entry => ({
-      ...entry,
-      budgetCodeId: entry.budgetCodeId === id ? undefined : entry.budgetCodeId
-    })));
+    setProjects(prev => prev.map(project => ({ ...project, budgetCodes: project.budgetCodes.filter(cid => cid !== id) })));
+    setBudgetEntries(prev => prev.map(entry => ({ ...entry, budgetCodeId: entry.budgetCodeId === id ? undefined : entry.budgetCodeId })));
   };
 
   const toggleBudgetCodeStatus = async (id: string) => {
     const current = budgetCodes.find(c => c.id === id);
     if (!current) return;
     const nextActive = !current.isActive;
-    // Optimistic update
-    setBudgetCodes(prev => prev.map(code => 
-      code.id === id 
-        ? { ...code, isActive: nextActive, updatedAt: new Date().toISOString() }
-        : code
-    ));
+    setBudgetCodes(prev =>
+      prev.map(code => (code.id === id ? { ...code, isActive: nextActive, updatedAt: new Date().toISOString() } : code)),
+    );
     if (useServerDb) {
       try {
         await budgetCodeService.update(id, { isActive: nextActive });
       } catch (e) {
-        // rollback on error
-        setBudgetCodes(prev => prev.map(code => 
-          code.id === id 
-            ? { ...code, isActive: !nextActive }
-            : code
-        ));
+        // rollback
+        setBudgetCodes(prev =>
+          prev.map(code => (code.id === id ? { ...code, isActive: !nextActive } : code)),
+        );
         console.error('Failed to toggle budget code status on server', e);
       }
     }
   };
 
+  // ----- Settings -----
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
   return (
-    <AppContext.Provider value={{
-      users,
-      divisions,
-      units,
-      projects,
-      budgetEntries,
-      budgetCodes,
-      notifications,
-      settings,
-      currentView,
-      selectedProject,
-      sidebarCollapsed,
-      setCurrentView,
-      setSelectedProject,
-      setSidebarCollapsed,
-      addDivision,
-      updateDivision,
-      deleteDivision,
-      addUnit,
-      updateUnit,
-      deleteUnit,
-      addProject,
-      updateProject,
-      deleteProject,
-      addBudgetEntry,
-      updateBudgetEntry,
-      deleteBudgetEntry,
-      addUser,
-      updateUser,
-      deleteUser,
-      addBudgetCode,
-      updateBudgetCode,
-      deleteBudgetCode,
-      toggleBudgetCodeStatus,
-      updateSettings,
-      addNotification,
-      markNotificationAsRead,
-      markAllNotificationsAsRead,
-      deleteNotification,
-      getUnreadNotificationCount
-    }}>
+    <AppContext.Provider
+      value={{
+        users,
+        divisions,
+        units,
+        projects,
+        budgetEntries,
+        budgetCodes,
+        notifications,
+        settings,
+        currentView,
+        selectedProject,
+        sidebarCollapsed,
+        setCurrentView,
+        setSelectedProject,
+        setSidebarCollapsed,
+
+        addDivision,
+        updateDivision,
+        deleteDivision,
+        renameDivision,
+
+        addUnit,
+        updateUnit,
+        deleteUnit,
+        renameUnit,
+
+        addProject,
+        updateProject,
+        deleteProject,
+
+        addBudgetEntry,
+        updateBudgetEntry,
+        deleteBudgetEntry,
+
+        addUser,
+        updateUser,
+        deleteUser,
+
+        addBudgetCode,
+        updateBudgetCode,
+        deleteBudgetCode,
+        toggleBudgetCodeStatus,
+
+        updateSettings,
+
+        addNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        deleteNotification,
+        getUnreadNotificationCount,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

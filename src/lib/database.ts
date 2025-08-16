@@ -771,3 +771,77 @@ export async function dbListUnits() {
   }
   return data;
 }
+// ⬇️ Add helper here at very bottom of database.ts
+export function checkSupabase<T>(label: string, data: T | null, error: any) {
+  if (error) {
+    console.error(`[SUPABASE ERROR] ${label}:`, error);
+    return null;
+  }
+  if (import.meta.env.DEV) {
+    console.log(`[SUPABASE OK] ${label}:`, data);
+  }
+  return data;
+}
+export async function dbDeleteDivision(id: string) {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { error } = await supabase.from('divisions').delete().eq('id', id);
+  if (error) {
+    console.error('dbDeleteDivision error:', error);
+    throw error;
+  }
+}
+
+export async function dbDeleteUnit(id: string) {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { error } = await supabase.from('units').delete().eq('id', id);
+  if (error) {
+    console.error('dbDeleteUnit error:', error);
+    throw error;
+  }
+}
+// --- Update (rename) helpers ---
+
+export async function dbUpdateDivision(
+  id: string,
+  input: { name?: string; code?: string }
+) {
+  const { data, error } = await supabase
+    .from('divisions')
+    .update({
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.code !== undefined ? { code: input.code } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('dbUpdateDivision error:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function dbUpdateUnit(
+  id: string,
+  input: { name?: string; code?: string; division_id?: string }
+) {
+  const { data, error } = await supabase
+    .from('units')
+    .update({
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.code !== undefined ? { code: input.code } : {}),
+      ...(input.division_id !== undefined ? { division_id: input.division_id } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('dbUpdateUnit error:', error);
+    throw error;
+  }
+  return data;
+}
