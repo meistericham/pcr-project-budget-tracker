@@ -466,11 +466,6 @@ export const budgetEntryService = {
   async create(entry: Omit<BudgetEntry, 'id' | 'createdAt'>): Promise<BudgetEntry> {
     if (useServerDb) {
       if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → supabase', entry);
-    
-      // get current auth user
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth?.user?.id;
-    
       const { data, error } = await supabase
         .from('budget_entries')
         .insert({
@@ -481,11 +476,11 @@ export const budgetEntryService = {
           type: entry.type,
           category: entry.category,
           date: entry.date,
-          ...(uid ? { created_by: uid } : {}), // only include if we have a UUID
+          // created_by omitted until we pass a real UUID
         })
         .select()
         .single();
-    
+      
       if (error) throw error;
       return transformBudgetEntry(data);
     }
