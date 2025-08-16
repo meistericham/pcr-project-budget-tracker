@@ -340,6 +340,7 @@ export const projectService = {
           spent: project.spent,
           assigned_users: project.assignedUsers,
           budget_codes: project.budgetCodes,
+          unit_id: (project as any).unitId,   // ✅ map camelCase → snake_case
           created_by: project.createdBy
         })
         .select()
@@ -364,6 +365,7 @@ export const projectService = {
         spent: project.spent,
         assigned_users: project.assignedUsers,
         budget_codes: project.budgetCodes,
+        unit_id: (project as any).unitId,   // ✅ map camelCase → snake_case
         created_by: project.createdBy
       })
       .select()
