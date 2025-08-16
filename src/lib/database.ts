@@ -478,7 +478,7 @@ export const budgetEntryService = {
           type: entry.type,
           category: entry.category,
           date: entry.date,
-          created_by: entry.createdBy
+          // created_by omitted until we pass a real UUID
         })
         .select()
         .single();
@@ -499,7 +499,7 @@ export const budgetEntryService = {
         type: entry.type,
         category: entry.category,
         date: entry.date,
-        created_by: entry.createdBy
+        //created_by: entry.createdBy
       })
       .select()
       .single();
