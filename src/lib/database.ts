@@ -476,56 +476,56 @@ export const budgetEntryService = {
     return data.map(transformBudgetEntry);
   },
 
-  if (useServerDb) {
-    console.log('[SRV] budget_entries.create:start', entry);
-    try {
-      // get current auth user
-      const { data: auth, error: authErr } = await supabase.auth.getUser();
-      console.log('[AUTH] budget_entries.create getUser →', { auth, authErr });
-      const uid = auth?.user?.id;
-      console.log('[AUTH] budget_entries.create uid →', uid);
+  async create(entry: Omit<BudgetEntry, 'id' | 'createdAt'>): Promise<BudgetEntry> {
+    if (useServerDb) {
+      if (import.meta.env.DEV) console.log('[SRV] budget_entries.create:start', entry);
+      try {
+        // get current auth user
+        const { data: auth, error: authErr } = await supabase.auth.getUser();
+        if (authErr) console.warn('[AUTH] budget_entries.create getUser error →', authErr);
+        const uid = auth?.user?.id;
+        if (import.meta.env.DEV) console.log('[AUTH] budget_entries.create uid →', uid);
   
-      const { data, error } = await supabase
-        .from('budget_entries')
-        .insert({
-          project_id: entry.projectId,
-          budget_code_id: entry.budgetCodeId,
-          description: entry.description,
-          amount: entry.amount,
-          type: entry.type,
-          category: entry.category,
-          date: entry.date,
-          ...(uid ? { created_by: uid } : {}),
-        })
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('budget_entries')
+          .insert({
+            project_id: entry.projectId,
+            budget_code_id: entry.budgetCodeId ?? null,
+            description: entry.description,
+            amount: entry.amount,
+            type: entry.type,
+            category: entry.category,
+            date: entry.date,
+            ...(uid ? { created_by: uid } : {}),
+          })
+          .select()
+          .single();
   
-      if (error) throw error;
-      console.log('[SRV] budget_entries.create:ok', data);
-      return transformBudgetEntry(data);
-    } catch (e) {
-      console.error('[SRV] budget_entries.create:error', e);
-      throw e;
+        if (error) throw error;
+        if (import.meta.env.DEV) console.log('[SRV] budget_entries.create:ok', data);
+        return transformBudgetEntry(data);
+      } catch (e) {
+        console.error('[SRV] budget_entries.create:error', e);
+        throw e;
+      }
     }
-  }
-    
+  
     // fallback local
     if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → local', entry);
     const { data, error } = await supabase
       .from('budget_entries')
       .insert({
         project_id: entry.projectId,
-        budget_code_id: entry.budgetCodeId,
+        budget_code_id: entry.budgetCodeId ?? null,
         description: entry.description,
         amount: entry.amount,
         type: entry.type,
         category: entry.category,
         date: entry.date,
-        //created_by: entry.createdBy
       })
       .select()
       .single();
-    
+  
     if (error) throw error;
     return transformBudgetEntry(data);
   },
