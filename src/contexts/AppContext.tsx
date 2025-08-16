@@ -101,7 +101,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const useServerDb = import.meta.env.VITE_USE_SERVER_DB === 'true';
-
+// TEMP DIAGNOSTIC
+console.log('[DB_MODE]', {
+  raw: import.meta.env.VITE_USE_SERVER_DB,
+  computed_useServerDb: useServerDb,
+});
   // Create debounced save functions
   const debouncedSaveUsers = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.USERS), []);
   const debouncedSaveProjects = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.PROJECTS), []);
