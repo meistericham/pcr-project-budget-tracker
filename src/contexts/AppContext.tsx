@@ -7,6 +7,8 @@ import {
   notificationService,
   dbCreateDivision,
   dbListDivisions
+  dbCreateUnit,        
+  dbListUnits          
 } from '../lib/database';
 import { useAuth } from './AuthContext';
 import { User, Project, BudgetEntry, BudgetCode, ViewMode, AppSettings, Notification, Division, Unit } from '../types';
@@ -437,6 +439,26 @@ useEffect(() => {
   const [units, setUnits] = useState<Unit[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits)
   );
+// Server mode: load units from Supabase on mount
+useEffect(() => {
+  if (!useServerDb) return;
+  (async () => {
+    try {
+      const rows = await dbListUnits();
+      const mapped = rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        ...(r.code ? { code: r.code } : {}),
+        divisionId: r.division_id,   // snake_case → camelCase
+        createdAt: r.created_at,
+        createdBy: '',
+      }));
+      setUnits(mapped);
+    } catch (e) {
+      console.error('Load units failed:', e);
+    }
+  })();
+}, [useServerDb]);
 
   const [projects, setProjects] = useState<Project[]>(() => 
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.PROJECTS, defaultProjects)
@@ -565,7 +587,40 @@ useEffect(() => {
   };
 
   const addUnit = (unitData: Omit<Unit, 'id' | 'createdAt'>) => {
-    const newUnit: Unit = { ...unitData, id: Date.now().toString(), createdAt: new Date().toISOString() };
+    if (useServerDb) {
+      const divisionId = (unitData as any).divisionId;
+      if (!divisionId) {
+        console.error('Create unit failed: divisionId is required in server mode');
+        return;
+      }
+      dbCreateUnit({
+        division_id: divisionId,                       // DB column
+        code: (unitData as any).code ?? unitData.name, // fallback if no code input
+        name: unitData.name,
+      })
+        .then((row: any) => {
+          const newUnit: Unit = {
+            id: row.id,
+            name: row.name,
+            ...(row.code ? { code: row.code } : {}),
+            divisionId: row.division_id,               // map snake_case → camelCase
+            createdAt: row.created_at,
+            createdBy: (unitData as any).createdBy ?? '',
+          };
+          setUnits(prev => [...prev, newUnit]);
+        })
+        .catch(err => {
+          console.error('Create unit (Supabase) failed:', err);
+        });
+      return;
+    }
+  
+    // === Local storage fallback (unchanged) ===
+    const newUnit: Unit = {
+      ...unitData,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
     setUnits(prev => [...prev, newUnit]);
   };
 
