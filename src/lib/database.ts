@@ -387,6 +387,7 @@ export const projectService = {
           budget: updates.budget,
           spent: updates.spent,
           assigned_users: updates.assignedUsers,
+          unit_id: (updates as any).unitId,          // ✅ include here too
           budget_codes: updates.budgetCodes,
           updated_at: new Date().toISOString()
         })
@@ -411,6 +412,7 @@ export const projectService = {
         budget: updates.budget,
         spent: updates.spent,
         assigned_users: updates.assignedUsers,
+        unit_id: (updates as any).unitId,    // 👈 add this
         budget_codes: updates.budgetCodes,
         updated_at: new Date().toISOString()
       })
