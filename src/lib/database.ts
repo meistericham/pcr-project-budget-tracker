@@ -476,9 +476,15 @@ export const budgetEntryService = {
     return data.map(transformBudgetEntry);
   },
 
-  async create(entry: Omit<BudgetEntry, 'id' | 'createdAt'>): Promise<BudgetEntry> {
-    if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → supabase', entry);
+  if (useServerDb) {
+    console.log('[SRV] budget_entries.create:start', entry);
+    try {
+      // get current auth user
+      const { data: auth, error: authErr } = await supabase.auth.getUser();
+      console.log('[AUTH] budget_entries.create getUser →', { auth, authErr });
+      const uid = auth?.user?.id;
+      console.log('[AUTH] budget_entries.create uid →', uid);
+  
       const { data, error } = await supabase
         .from('budget_entries')
         .insert({
@@ -489,14 +495,19 @@ export const budgetEntryService = {
           type: entry.type,
           category: entry.category,
           date: entry.date,
-          ...(uid ? { created_by: uid } : {}), // include only if we have a UUI
+          ...(uid ? { created_by: uid } : {}),
         })
         .select()
         .single();
-      
+  
       if (error) throw error;
+      console.log('[SRV] budget_entries.create:ok', data);
       return transformBudgetEntry(data);
+    } catch (e) {
+      console.error('[SRV] budget_entries.create:error', e);
+      throw e;
     }
+  }
     
     // fallback local
     if (import.meta.env.DEV) console.log('[SRV] budget_entries.create → local', entry);
