@@ -633,20 +633,28 @@ useEffect(() => {
     setDivisions(prev => prev.filter(d => d.id !== divisionId));
   };
 
-  const renameDivision = async (id: string, newName: string) => {
-    if (useServerDb) {
-      try {
-        const row = await dbUpdateDivision(id, { name: newName });
-        setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name: row.name } : d)));
-        return row;
-      } catch (err) {
-        console.error('Rename division failed:', err);
-        throw err;
-      }
-    } else {
-      setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name: newName } : d)));
+  // --- Rename a Division ---
+const renameDivision = async (id: string, newName: string) => {
+  // Trim + no-op guard
+  const name = (newName ?? '').trim();
+  if (!id || !name) return;
+
+  if (useServerDb) {
+    try {
+      const row = await dbUpdateDivision(id, { name });
+      // keep UI in sync with returned row
+      setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name: row.name } : d)));
+      return row;
+    } catch (err) {
+      console.error('Rename division failed:', err);
+      throw err;
     }
-  };
+  } else {
+    // local-only mode
+    setDivisions(prev => prev.map(d => (d.id === id ? { ...d, name } : d)));
+  }
+};
+
 
   // ----- Unit CRUD -----
   const addUnit = async (unitData: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit> => {
@@ -694,21 +702,24 @@ useEffect(() => {
     setProjects(prev => prev.map(p => (p.unitId === id ? { ...p, unitId: '' } : p)));
     setBudgetEntries(prev => prev.map(e => (e.unitId === id ? { ...e, unitId: undefined } : e)));
   };
+  // --- Rename a Unit ---
+const renameUnit = async (id: string, newName: string) => {
+  const name = (newName ?? '').trim();
+  if (!id || !name) return;
 
-  const renameUnit = async (id: string, newName: string) => {
-    if (useServerDb) {
-      try {
-        const row = await dbUpdateUnit(id, { name: newName });
-        setUnits(prev => prev.map(u => (u.id === id ? { ...u, name: row.name } : u)));
-        return row;
-      } catch (err) {
-        console.error('Rename unit failed:', err);
-        throw err;
-      }
-    } else {
-      setUnits(prev => prev.map(u => (u.id === id ? { ...u, name: newName } : u)));
+  if (useServerDb) {
+    try {
+      const row = await dbUpdateUnit(id, { name });
+      setUnits(prev => prev.map(u => (u.id === id ? { ...u, name: row.name } : u)));
+      return row;
+    } catch (err) {
+      console.error('Rename unit failed:', err);
+      throw err;
     }
-  };
+  } else {
+    setUnits(prev => prev.map(u => (u.id === id ? { ...u, name } : u)));
+  }
+};
 
   // ----- Notifications helpers -----
   const addNotification = async (notificationData: Omit<Notification, 'id' | 'createdAt'>) => {

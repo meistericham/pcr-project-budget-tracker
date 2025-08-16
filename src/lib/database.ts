@@ -97,20 +97,26 @@ const transformNotification = (dbNotification: any): Notification => ({
 // User operations
 export const userService = {
   async getAll(): Promise<User[]> {
-    if (!isSupabaseConfigured) return [];
+    try {
+      if (!isSupabaseConfigured) {
+        console.warn('[users.getAll] Supabase not configured');
+        return [];
+      }
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      // Do NOT throw here — just log and return []
-      console.warn('[users.getAll] fetch users failed:', error);
+      if (error) {
+        console.error('[users.getAll] fetch users failed:', error);
+        return [];
+      }
+      return (data ?? []).map(transformUser);
+    } catch (err) {
+      console.error('[users.getAll] unexpected error:', err);
       return [];
     }
-
-    return (data ?? []).map(transformUser);
   },
 
   async create(user: Omit<User, 'id' | 'createdAt'>): Promise<User> {
@@ -124,7 +130,6 @@ export const userService = {
       })
       .select()
       .single();
-
     if (error) throw error;
     return transformUser(data);
   },
@@ -141,7 +146,6 @@ export const userService = {
       .eq('id', id)
       .select()
       .single();
-
     if (error) throw error;
     return transformUser(data);
   },
