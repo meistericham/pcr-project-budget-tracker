@@ -187,26 +187,38 @@ export const budgetCodeService = {
 
   async create(code: Omit<BudgetCode, 'id' | 'createdAt' | 'updatedAt'>): Promise<BudgetCode> {
     if (useServerDb) {
-      if (import.meta.env.DEV) console.log('[SRV] budget_codes.create → supabase', code);
-      const { data, error } = await supabase
-        .from('budget_codes')
-        .insert({
-          code: code.code,
-          name: code.name,
-          description: code.description,
-          budget: code.budget,
-          spent: code.spent,
-          is_active: code.isActive,
-          ...(uid ? { created_by: uid } : {}), // include only if we have a UUID
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return transformBudgetCode(data);
+      console.log('[SRV] budget_codes.create:start', code);
+      try {
+        // get current auth user
+        const { data: auth, error: authErr } = await supabase.auth.getUser();
+        console.log('[AUTH] budget_codes.create getUser →', { auth, authErr });
+        const uid = auth?.user?.id;
+        console.log('[AUTH] budget_codes.create uid →', uid);
+  
+        const { data, error } = await supabase
+          .from('budget_codes')
+          .insert({
+            code: code.code,
+            name: code.name,
+            description: code.description,
+            budget: code.budget,
+            spent: code.spent,
+            is_active: code.isActive,
+            ...(uid ? { created_by: uid } : {}),
+          })
+          .select()
+          .single();
+  
+        if (error) throw error;
+        console.log('[SRV] budget_codes.create:ok', data);
+        return transformBudgetCode(data);
+      } catch (e) {
+        console.error('[SRV] budget_codes.create:error', e);
+        throw e;
+      }
     }
-    
-    // fallback local
+  
+    // fallback local (unchanged)
     if (import.meta.env.DEV) console.log('[SRV] budget_codes.create → local', code);
     const { data, error } = await supabase
       .from('budget_codes')
@@ -220,10 +232,10 @@ export const budgetCodeService = {
       })
       .select()
       .single();
-    
+  
     if (error) throw error;
     return transformBudgetCode(data);
-  },
+  }
 
   async update(id: string, updates: Partial<BudgetCode>): Promise<BudgetCode> {
     if (useServerDb) {
