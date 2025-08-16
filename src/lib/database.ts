@@ -685,4 +685,61 @@ export const notificationService = {
     if (error) throw error;
   }
 };
+// --- Divisions & Units (server mode) ---
+export async function dbCreateDivision(input: { code: string; name: string }) {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { data, error } = await supabase
+    .from('divisions')
+    .insert({ code: input.code, name: input.name })
+    .select('*')
+    .single();
+  if (error) {
+    console.error('dbCreateDivision error:', error);
+    throw error;
+  }
+  return data;
+}
 
+export async function dbListDivisions() {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { data, error } = await supabase
+    .from('divisions')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('dbListDivisions error:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function dbCreateUnit(input: { division_id: string; code: string; name: string }) {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { data, error } = await supabase
+    .from('units')
+    .insert({
+      division_id: input.division_id,
+      code: input.code,
+      name: input.name,
+    })
+    .select('*')
+    .single();
+  if (error) {
+    console.error('dbCreateUnit error:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function dbListUnits() {
+  if (!useServerDb) throw new Error('Not in server DB mode');
+  const { data, error } = await supabase
+    .from('units')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('dbListUnits error:', error);
+    throw error;
+  }
+  return data;
+}
