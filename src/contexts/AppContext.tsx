@@ -6,7 +6,7 @@ import {
   budgetCodeService,
   notificationService,
   dbCreateDivision,
-  dbListDivisions
+  dbListDivisions,
   dbCreateUnit,        
   dbListUnits          
 } from '../lib/database';
