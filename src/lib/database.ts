@@ -489,7 +489,7 @@ export const budgetEntryService = {
           type: entry.type,
           category: entry.category,
           date: entry.date,
-          // created_by omitted until we pass a real UUID
+          ...(uid ? { created_by: uid } : {}), // include only if we have a UUID
         })
         .select()
         .single();
