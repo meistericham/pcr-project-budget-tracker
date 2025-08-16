@@ -491,36 +491,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   }, [useServerDb]);
 
-  // Hydrate other server data
-  useEffect(() => {
-    if (!useServerDb) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [remoteUsers, remoteCodes, remoteProjects, remoteEntries, remoteNotifs] =
-          await Promise.all([
-            userService.getAll().catch(() => users),
-            budgetCodeService.getAll().catch(() => budgetCodes),
-            projectService.getAll().catch(() => projects),
-            budgetEntryService.getAll().catch(() => budgetEntries),
-            notificationService.getAll().catch(() => notifications),
-          ]);
-        if (!cancelled) {
-          setUsers(remoteUsers);
-          setBudgetCodes(remoteCodes);
-          setProjects(remoteProjects);
-          setBudgetEntries(remoteEntries);
-          setNotifications(remoteNotifs);
-        }
-      } catch (e) {
-        console.error('[CTX] hydrate error', e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Hydrate other server data (defensive: don't overwrite with empty/failed results)
+useEffect(() => {
+  if (!useServerDb) return;
+
+  let cancelled = false;
+  (async () => {
+    try {
+      const usersP = userService.getAll().catch(e => {
+        console.warn('[CTX] users fetch failed, keeping existing:', e);
+        return [] as User[];
+      });
+      const codesP = budgetCodeService.getAll().catch(e => {
+        console.warn('[CTX] budget codes fetch failed, keeping existing:', e);
+        return [] as BudgetCode[];
+      });
+      const projectsP = projectService.getAll().catch(e => {
+        console.warn('[CTX] projects fetch failed, keeping existing:', e);
+        return [] as Project[];
+      });
+      const entriesP = budgetEntryService.getAll().catch(e => {
+        console.warn('[CTX] entries fetch failed, keeping existing:', e);
+        return [] as BudgetEntry[];
+      });
+      const notifsP = notificationService.getAll().catch(e => {
+        console.warn('[CTX] notifications fetch failed, keeping existing:', e);
+        return [] as Notification[];
+      });
+
+      const [remoteUsers, remoteCodes, remoteProjects, remoteEntries, remoteNotifs] =
+        await Promise.all([usersP, codesP, projectsP, entriesP, notifsP]);
+
+      if (cancelled) return;
+
+      // Only replace if we actually got some data; otherwise keep current state
+      if (remoteUsers.length) setUsers(remoteUsers);
+      if (remoteCodes.length) setBudgetCodes(remoteCodes);
+      if (remoteProjects.length) setProjects(remoteProjects);
+      if (remoteEntries.length) setBudgetEntries(remoteEntries);
+      if (remoteNotifs.length) setNotifications(remoteNotifs);
+    } catch (e) {
+      console.error('[CTX] hydrate error (soft):', e);
+      // keep existing local state
+    }
+  })();
+
+  return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   // Persist to localStorage in non-server mode
   useEffect(() => {
