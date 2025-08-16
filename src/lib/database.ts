@@ -97,25 +97,20 @@ const transformNotification = (dbNotification: any): Notification => ({
 // User operations
 export const userService = {
   async getAll(): Promise<User[]> {
-    try {
-      if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
-      }
-      
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        handleDatabaseError(error, 'fetch users');
-      }
-      
-      return data?.map(transformUser) || [];
-    } catch (error) {
-      handleDatabaseError(error, 'fetch users');
+    if (!isSupabaseConfigured) return [];
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // Do NOT throw here — just log and return []
+      console.warn('[users.getAll] fetch users failed:', error);
       return [];
     }
+
+    return (data ?? []).map(transformUser);
   },
 
   async create(user: Omit<User, 'id' | 'createdAt'>): Promise<User> {
@@ -129,7 +124,7 @@ export const userService = {
       })
       .select()
       .single();
-    
+
     if (error) throw error;
     return transformUser(data);
   },
@@ -146,17 +141,13 @@ export const userService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return transformUser(data);
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from('users').delete().eq('id', id);
     if (error) throw error;
   }
 };
