@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { userService, projectService, budgetEntryService, budgetCodeService, notificationService } from '../lib/database';
+import {
+  userService,
+  projectService,
+  budgetEntryService,
+  budgetCodeService,
+  notificationService,
+  dbCreateDivision,
+  dbListDivisions
+} from '../lib/database';
 import { useAuth } from './AuthContext';
 import { User, Project, BudgetEntry, BudgetCode, ViewMode, AppSettings, Notification, Division, Unit } from '../types';
 
@@ -405,6 +413,26 @@ console.log(
   const [divisions, setDivisions] = useState<Division[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.DIVISIONS, defaultDivisions)
   );
+// Server mode: load divisions from Supabase on mount
+useEffect(() => {
+  if (!useServerDb) return;
+  (async () => {
+    try {
+      const rows = await dbListDivisions();
+      const mapped = rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        // keep code if your Division type has it
+        ...(r.code ? { code: r.code } : {}),
+        createdAt: r.created_at,
+        createdBy: '',
+      }));
+      setDivisions(mapped);
+    } catch (e) {
+      console.error('Load divisions failed:', e);
+    }
+  })();
+}, [useServerDb]);
 
   const [units, setUnits] = useState<Unit[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.UNITS, defaultUnits)
@@ -492,7 +520,34 @@ console.log(
     }
   }, [units, useServerDb]);
   const addDivision = (divisionData: Omit<Division, 'id' | 'createdAt'>) => {
-    const newDivision: Division = { ...divisionData, id: Date.now().toString(), createdAt: new Date().toISOString() };
+    if (useServerDb) {
+      dbCreateDivision({
+        // if your UI doesn’t provide `code`, we’ll fallback to using the name
+        code: (divisionData as any).code ?? divisionData.name,
+        name: divisionData.name,
+      })
+        .then((row: any) => {
+          const newDivision: Division = {
+            id: row.id,
+            name: row.name,
+            ...(row.code ? { code: row.code } : {}),
+            createdAt: row.created_at,
+            createdBy: (divisionData as any).createdBy ?? '',
+          };
+          setDivisions(prev => [...prev, newDivision]);
+        })
+        .catch(err => {
+          console.error('Create division (Supabase) failed:', err);
+        });
+      return;
+    }
+  
+    // === Local storage fallback (unchanged) ===
+    const newDivision: Division = {
+      ...divisionData,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
     setDivisions(prev => [...prev, newDivision]);
   };
 
