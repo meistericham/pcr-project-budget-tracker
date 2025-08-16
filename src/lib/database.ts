@@ -197,7 +197,6 @@ export const budgetCodeService = {
           budget: code.budget,
           spent: code.spent,
           is_active: code.isActive,
-          created_by: code.createdBy
         })
         .select()
         .single();
@@ -217,7 +216,6 @@ export const budgetCodeService = {
         budget: code.budget,
         spent: code.spent,
         is_active: code.isActive,
-        created_by: code.createdBy
       })
       .select()
       .single();
