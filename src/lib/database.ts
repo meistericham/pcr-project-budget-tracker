@@ -197,6 +197,7 @@ export const budgetCodeService = {
           budget: code.budget,
           spent: code.spent,
           is_active: code.isActive,
+          ...(uid ? { created_by: uid } : {}), // include only if we have a UUID
         })
         .select()
         .single();
