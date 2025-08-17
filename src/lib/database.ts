@@ -596,6 +596,7 @@ export const notificationService = {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      console.log('[notifications.getAll] rows →', data); // 👈 add this
       return data.map(transformNotification);
     }
     
