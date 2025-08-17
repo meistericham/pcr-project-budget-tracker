@@ -800,19 +800,28 @@ export async function dbUpdateDivision(
   id: string,
   input: { name?: string; code?: string }
 ) {
+  const payload: any = {
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.code !== undefined ? { code: input.code } : {}),
+    updated_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('divisions')
-    .update({
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.code !== undefined ? { code: input.code } : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(payload)
     .eq('id', id)
     .select('*')
     .single();
 
   if (error) {
-    console.error('dbUpdateDivision error:', error);
+    console.error('[dbUpdateDivision] FAILED', {
+      id,
+      payload,
+      code: (error as any).code,
+      message: (error as any).message,
+      details: (error as any).details,
+      hint: (error as any).hint,
+    });
     throw error;
   }
   return data;
