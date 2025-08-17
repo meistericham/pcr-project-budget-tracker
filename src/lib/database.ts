@@ -600,14 +600,15 @@ export const notificationService = {
       return data.map(transformNotification);
     }
     
+    // Local mode - load from localStorage
     if (import.meta.env.DEV) console.log('[SRV] notifications.list → local');
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data.map(transformNotification);
+    try {
+      const stored = localStorage.getItem('pcr_notifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Failed to load notifications from localStorage:', error);
+      return [];
+    }
   },
 
   async create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
@@ -631,24 +632,26 @@ export const notificationService = {
       return transformNotification(data);
     }
     
-    // fallback local
+    // Local mode - create and store in localStorage
     if (import.meta.env.DEV) console.log('[SRV] notifications.create → local', notification);
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: notification.userId,
-        type: notification.type,
-        title: notification.title,
-        message: notification.message,
-        data: notification.data,
-        read: notification.read,
-        action_url: notification.actionUrl
-      })
-      .select()
-      .single();
+    const newNotification: Notification = {
+      ...notification,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
     
-    if (error) throw error;
-    return transformNotification(data);
+    try {
+      const stored = localStorage.getItem('pcr_notifications');
+      const notifications = stored ? JSON.parse(stored) : [];
+      notifications.unshift(newNotification);
+      // Keep only last 100 notifications to prevent localStorage bloat
+      const trimmedNotifications = notifications.slice(0, 100);
+      localStorage.setItem('pcr_notifications', JSON.stringify(trimmedNotifications));
+    } catch (error) {
+      console.error('Failed to save notification to localStorage:', error);
+    }
+    
+    return newNotification;
   },
 
   async markAsRead(id: string): Promise<void> {
@@ -663,14 +666,20 @@ export const notificationService = {
       return;
     }
     
-    // fallback local
+    // Local mode - update in localStorage
     if (import.meta.env.DEV) console.log('[SRV] notifications.markAsRead → local', id);
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', id);
-    
-    if (error) throw error;
+    try {
+      const stored = localStorage.getItem('pcr_notifications');
+      if (stored) {
+        const notifications = JSON.parse(stored);
+        const updatedNotifications = notifications.map((n: Notification) =>
+          n.id === id ? { ...n, read: true } : n
+        );
+        localStorage.setItem('pcr_notifications', JSON.stringify(updatedNotifications));
+      }
+    } catch (error) {
+      console.error('Failed to update notification in localStorage:', error);
+    }
   },
 
   async markAllAsRead(userId: string): Promise<void> {
@@ -685,14 +694,20 @@ export const notificationService = {
       return;
     }
     
-    // fallback local
+    // Local mode - update all user notifications in localStorage
     if (import.meta.env.DEV) console.log('[SRV] notifications.markAllAsRead → local', userId);
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', userId);
-    
-    if (error) throw error;
+    try {
+      const stored = localStorage.getItem('pcr_notifications');
+      if (stored) {
+        const notifications = JSON.parse(stored);
+        const updatedNotifications = notifications.map((n: Notification) =>
+          n.userId === userId ? { ...n, read: true } : n
+        );
+        localStorage.setItem('pcr_notifications', JSON.stringify(updatedNotifications));
+      }
+    } catch (error) {
+      console.error('Failed to update notifications in localStorage:', error);
+    }
   },
 
   async delete(id: string): Promise<void> {
@@ -703,10 +718,18 @@ export const notificationService = {
       return;
     }
     
-    // fallback local
+    // Local mode - remove from localStorage
     if (import.meta.env.DEV) console.log('[SRV] notifications.remove → local', id);
-    const { error } = await supabase.from('notifications').delete().eq('id', id);
-    if (error) throw error;
+    try {
+      const stored = localStorage.getItem('pcr_notifications');
+      if (stored) {
+        const notifications = JSON.parse(stored);
+        const filteredNotifications = notifications.filter((n: Notification) => n.id !== id);
+        localStorage.setItem('pcr_notifications', JSON.stringify(filteredNotifications));
+      }
+    } catch (error) {
+      console.error('Failed to delete notification from localStorage:', error);
+    }
   }
 };
 // --- Divisions & Units (server mode) ---

@@ -15,6 +15,7 @@ import UsersAdmin from './pages/UsersAdmin';
 import Debug from './pages/Debug';
 import { supabase } from './lib/supabase';
 import React from 'react';
+import './App.css';
 
 const AppContent = () => {
   const { currentView } = useApp();
@@ -134,8 +135,6 @@ function App() {
   );
 }
 
-export default App;
-
 const DevRoleBanner: React.FC = () => {
   const { role, user } = useAuth() as any;
   const uid = user?.id || '';
@@ -146,3 +145,5 @@ const DevRoleBanner: React.FC = () => {
     </div>
   );
 };
+
+export default App;

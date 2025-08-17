@@ -28,16 +28,30 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }
     setCurrentView,
     projects
   } = useApp();
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const userNotifications = notifications.filter(n => n.userId === currentUser?.id);
+  // Debug logging
+  console.log('[NotificationPanel] Render:', {
+    isOpen,
+    totalNotifications: notifications.length,
+    currentUser: user?.id,
+    filter
+  });
+
+  const userNotifications = notifications.filter(n => n.userId === user?.id);
   const filteredNotifications = filter === 'unread' 
     ? userNotifications.filter(n => !n.read)
     : userNotifications;
 
   const unreadCount = userNotifications.filter(n => !n.read).length;
+
+  console.log('[NotificationPanel] Filtered:', {
+    userNotifications: userNotifications.length,
+    filteredNotifications: filteredNotifications.length,
+    unreadCount
+  });
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {

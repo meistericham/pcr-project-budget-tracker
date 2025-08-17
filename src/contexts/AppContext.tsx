@@ -86,6 +86,7 @@ interface AppContextType {
   markAllNotificationsAsRead: () => void;
   deleteNotification: (id: string) => void;
   getUnreadNotificationCount: () => number;
+  createTestNotification: (type: Notification['type']) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -201,6 +202,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: '2', name: 'John Doe', email: 'john@company.com', role: 'super_admin', initials: 'JD', createdAt: '2024-01-01T00:00:00Z' },
     { id: '3', name: 'Sarah Chen', email: 'sarah@company.com', role: 'admin', initials: 'SC', createdAt: '2024-01-02T00:00:00Z' },
     { id: '4', name: 'Mike Johnson', email: 'mike@company.com', role: 'user', initials: 'MJ', createdAt: '2024-01-03T00:00:00Z' },
+  ];
+
+  const defaultNotifications: Notification[] = [
+    {
+      id: '1',
+      userId: '1',
+      type: 'project_created',
+      title: 'Welcome to PCR Project Tracker!',
+      message: 'Your first project has been created. Start managing your projects and budgets efficiently.',
+      data: { projectId: '1' },
+      read: false,
+      createdAt: '2024-01-01T00:00:00Z',
+    },
+    {
+      id: '2',
+      userId: '1',
+      type: 'budget_alert',
+      title: 'Budget Alert: Website Redesign',
+      message: 'Project "Website Redesign" has used 37% of its allocated budget.',
+      data: { projectId: '1', percentage: 37, budget: 200000, spent: 74000 },
+      read: false,
+      createdAt: '2024-01-20T00:00:00Z',
+    },
+    {
+      id: '3',
+      userId: '1',
+      type: 'user_assigned',
+      title: 'Project Assignment',
+      message: 'You have been assigned to the project: Mobile App Development',
+      data: { projectId: '2' },
+      read: true,
+      createdAt: '2024-01-25T00:00:00Z',
+    },
   ];
 
   const defaultBudgetCodes: BudgetCode[] = [
@@ -447,7 +481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.BUDGET_ENTRIES, defaultBudgetEntries),
   );
   const [notifications, setNotifications] = useState<Notification[]>(() =>
-    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, []),
+    useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, defaultNotifications),
   );
 
   // Load divisions (server)
@@ -560,8 +594,10 @@ useEffect(() => {
     if (!useServerDb) saveToStorage(STORAGE_KEYS.UNITS, units);
   }, [units, useServerDb]);
   useEffect(() => {
-    debouncedSaveNotifications(notifications);
-  }, [notifications, debouncedSaveNotifications]);
+    if (!useServerDb) {
+      debouncedSaveNotifications(notifications);
+    }
+  }, [notifications, debouncedSaveNotifications, useServerDb]);
   useEffect(() => {
     debouncedSaveSettings(settings);
   }, [settings, debouncedSaveSettings]);
@@ -723,6 +759,7 @@ const renameUnit = async (id: string, newName: string) => {
 
   // ----- Notifications helpers -----
   const addNotification = async (notificationData: Omit<Notification, 'id' | 'createdAt'>) => {
+    console.log('[CTX] Adding notification:', notificationData);
     let newNotification: Notification;
     if (useServerDb) {
       newNotification = await notificationService.create(notificationData);
@@ -733,13 +770,16 @@ const renameUnit = async (id: string, newName: string) => {
         createdAt: new Date().toISOString(),
       } as Notification;
     }
+    console.log('[CTX] Created notification:', newNotification);
     setNotifications(prev => {
       const updated = [newNotification, ...prev];
+      console.log('[CTX] Updated notifications state:', updated.length, 'notifications');
       return updated.slice(0, 100);
     });
   };
 
   const markNotificationAsRead = (id: string) => {
+    console.log('[CTX] Marking notification as read:', id);
     if (useServerDb) {
       notificationService.markAsRead(id).catch(console.error);
     }
@@ -750,6 +790,7 @@ const renameUnit = async (id: string, newName: string) => {
 
   const markAllNotificationsAsRead = () => {
     if (!user) return;
+    console.log('[CTX] Marking all notifications as read for user:', user.id);
     if (useServerDb) {
       notificationService.markAllAsRead(user.id).catch(console.error);
     }
@@ -759,6 +800,7 @@ const renameUnit = async (id: string, newName: string) => {
   };
 
   const deleteNotification = (id: string) => {
+    console.log('[CTX] Deleting notification:', id);
     if (useServerDb) {
       notificationService.delete(id).catch(console.error);
     }
@@ -767,7 +809,21 @@ const renameUnit = async (id: string, newName: string) => {
 
   const getUnreadNotificationCount = () => {
     if (!user) return 0;
-    return notifications.filter(n => !n.read && n.userId === user.id).length;
+    const count = notifications.filter(n => !n.read && n.userId === user.id).length;
+    console.log('[CTX] Unread notification count for user', user.id, ':', count);
+    return count;
+  };
+
+  const createTestNotification = (type: Notification['type']) => {
+    console.log('[CTX] Creating test notification of type:', type);
+    addNotification({
+      userId: '1', // Test user
+      type,
+      title: `Test ${type} Notification`,
+      message: `This is a test ${type} notification.`,
+      data: { test: true },
+      read: false,
+    });
   };
 
   // ----- Budget code alert helper -----
@@ -778,6 +834,7 @@ const renameUnit = async (id: string, newName: string) => {
     message: string,
     data?: any,
   ) => {
+    console.log('[CTX] notifyUsers called:', { userIds, type, title, message, data });
     userIds.forEach(userId => {
       addNotification({
         userId,
@@ -797,6 +854,7 @@ const renameUnit = async (id: string, newName: string) => {
     data?: any,
     excludeUserId?: string,
   ) => {
+    console.log('[CTX] notifyAllUsers called:', { type, title, message, data, excludeUserId });
     users.forEach(u => {
       if (u.id !== excludeUserId) {
         addNotification({
@@ -1236,6 +1294,7 @@ const renameUnit = async (id: string, newName: string) => {
         markAllNotificationsAsRead,
         deleteNotification,
         getUnreadNotificationCount,
+        createTestNotification,
       }}
     >
       {children}

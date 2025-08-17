@@ -21,7 +21,7 @@ import { useIsSuperAdmin } from '../lib/authz';
 import { useTheme } from '../contexts/ThemeContext';
 import DatabaseSetup from './DatabaseSetup';
 import DatabaseStatus from './DatabaseStatus';
-import GoogleSheetsIntegration from './GoogleSheetsIntegration';
+import GoogleSheetsIntegration from './GoogleSheetsIntegration'; 
 import PasswordChangeModal from './PasswordChangeModal';
 import NotificationTest from './NotificationTest';
 
@@ -536,7 +536,7 @@ const SettingsView = () => {
                   <li>• Easy data export</li>
                   <li>• Collaborative editing</li>
                   <li>• Basic reporting</li>
-                  <li>• See Integrations tab</li>
+                  <li>• <a href="#" onClick={() => setActiveTab('integrations')} className="text-blue-600 dark:text-blue-400 hover:underline">Go to Integrations tab</a></li>
                 </ul>
               </div>
             </div>
@@ -796,7 +796,7 @@ const SettingsView = () => {
             {activeTab === 'notifications' && renderNotificationSettings()}
             {activeTab === 'backup' && renderBackupSettings()}
             {activeTab === 'database' && renderDatabaseSettings()}
-            {activeTab === 'integrations' && renderNotificationSettings()}
+            {activeTab === 'integrations' && <GoogleSheetsIntegration />}
             {activeTab === 'categories' && renderCategorySettings()}
           </div>
         </div>
