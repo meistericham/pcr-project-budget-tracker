@@ -11,7 +11,9 @@ import {
   User,
   AlertTriangle,
   Search,
-  Filter
+  Filter,
+  Building2,
+  Users
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useIsSuperAdmin } from '../lib/authz';
@@ -20,12 +22,14 @@ import UserModal from './UserModal';
 import EmailModal from './EmailModal';
 
 const UsersView = () => {
-  const { users, deleteUser } = useApp();
+  const { users, deleteUser, divisions, units } = useApp();
   const { allowed: isSA } = useIsSuperAdmin();
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'user'>('all');
+  const [divisionFilter, setDivisionFilter] = useState<string | 'all'>('all');
+  const [unitFilter, setUnitFilter] = useState<string | 'all'>('all');
   const [resetTarget, setResetTarget] = useState<UserType | null>(null);
 
   const isSuperAdmin = !!isSA;
@@ -34,7 +38,9 @@ const UsersView = () => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesDivision = divisionFilter === 'all' || user.divisionId === divisionFilter;
+    const matchesUnit = unitFilter === 'all' || user.unitId === unitFilter;
+    return matchesSearch && matchesRole && matchesDivision && matchesUnit;
   });
 
   const getRoleIcon = (role: string) => {
@@ -206,6 +212,27 @@ const UsersView = () => {
               </div>
             </div>
           </div>
+
+          {/* Division & Unit Assignment Stats */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned Users</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {users.filter(u => u.divisionId || u.unitId).length}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {users.filter(u => u.divisionId || u.unitId).length === 0 
+                    ? 'No assignments yet' 
+                    : `${((users.filter(u => u.divisionId || u.unitId).length / users.length) * 100).toFixed(0)}% of total`
+                  }
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                <Building2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -231,6 +258,33 @@ const UsersView = () => {
               <option value="super_admin">Super Admins</option>
               <option value="admin">Admins</option>
               <option value="user">Users</option>
+            </select>
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+            >
+              <option value="all">All Divisions</option>
+              {divisions.map((division) => (
+                <option key={division.id} value={division.id}>
+                  {division.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={unitFilter}
+              onChange={(e) => setUnitFilter(e.target.value)}
+              disabled={!divisionFilter || divisionFilter === 'all'}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="all">All Units</option>
+              {units
+                .filter(unit => !divisionFilter || divisionFilter === 'all' || unit.divisionId === divisionFilter)
+                .map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
@@ -301,6 +355,50 @@ const UsersView = () => {
                   </span>
                 )}
               </div>
+
+              {/* Division & Unit Assignment */}
+              {(user.divisionId || user.unitId) ? (
+                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
+                    Assignment
+                  </h4>
+                  <div className="space-y-1 text-xs">
+                    {user.divisionId && (
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="h-3 w-3 text-gray-500" />
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Division: {divisions.find(d => d.id === user.divisionId)?.name || 'Unknown'}
+                        </span>
+                      </div>
+                    )}
+                    {user.unitId && (
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-3 w-3 text-gray-500" />
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Unit: {units.find(u => u.id === user.unitId)?.name || 'Unknown'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+                      <span className="text-xs text-yellow-800 dark:text-yellow-300 font-medium">
+                        No Division/Unit Assignment
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleEdit(user)}
+                      className="text-xs text-yellow-700 dark:text-yellow-300 hover:text-yellow-800 dark:hover:text-yellow-200 underline"
+                    >
+                      Assign Now
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Details */}
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
@@ -390,15 +488,15 @@ const UsersView = () => {
               <User className="h-8 w-8 text-gray-400 dark:text-gray-500" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {searchTerm || roleFilter !== 'all' ? 'No users found' : 'No users yet'}
+              {searchTerm || roleFilter !== 'all' || divisionFilter !== 'all' || unitFilter !== 'all' ? 'No users found' : 'No users yet'}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              {searchTerm || roleFilter !== 'all' 
+              {searchTerm || roleFilter !== 'all' || divisionFilter !== 'all' || unitFilter !== 'all' 
                 ? 'Try adjusting your search or filter criteria'
                 : 'Add team members to start collaborating'
               }
             </p>
-            {(!searchTerm && roleFilter === 'all') && (
+            {(!searchTerm && roleFilter === 'all' && divisionFilter === 'all' && unitFilter === 'all') && (
               <button
                 onClick={() => setShowModal(true)}
                 className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"

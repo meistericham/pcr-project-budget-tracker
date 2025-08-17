@@ -92,7 +92,7 @@ export default function UsersAdmin() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold mb-4">User Management (Super Admin)</h1>
+      <h1 className="text-xl font-semibold mb-4">Password Management (Super Admin)</h1>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm border border-gray-200 dark:border-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">

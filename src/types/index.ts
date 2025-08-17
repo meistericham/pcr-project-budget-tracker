@@ -5,6 +5,8 @@ export interface User {
   role: 'super_admin' | 'admin' | 'user';
   avatar?: string;
   initials: string;
+  divisionId?: string; // Optional: User's assigned division
+  unitId?: string; // Optional: User's assigned unit
   createdAt: string;
 }
 

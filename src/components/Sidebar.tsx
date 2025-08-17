@@ -56,7 +56,7 @@ const Sidebar = () => {
     },
     { 
       icon: Shield, 
-      label: 'User Management', 
+      label: 'Password Management', 
       view: 'admin-users' as ViewMode,
       superAdminOnly: true
     },
