@@ -796,49 +796,43 @@ export async function dbDeleteUnit(id: string) {
 }
 // --- Update (rename) helpers ---
 
+// ---- Division update (NO updated_at) ----
 export async function dbUpdateDivision(
   id: string,
   input: { name?: string; code?: string }
 ) {
-  const payload: any = {
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.code !== undefined ? { code: input.code } : {}),
-    updated_at: new Date().toISOString(),
-  };
+  // Build clean payload without undefined keys
+  const payload: Record<string, any> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.code !== undefined) payload.code = input.code;
 
   const { data, error } = await supabase
     .from('divisions')
-    .update(payload)
+    .update(payload)        // <-- no updated_at here
     .eq('id', id)
     .select('*')
     .single();
 
   if (error) {
-    console.error('[dbUpdateDivision] FAILED', {
-      id,
-      payload,
-      code: (error as any).code,
-      message: (error as any).message,
-      details: (error as any).details,
-      hint: (error as any).hint,
-    });
+    console.error('dbUpdateDivision error:', error);
     throw error;
   }
   return data;
 }
 
+// ---- Unit update (NO updated_at) ----
 export async function dbUpdateUnit(
   id: string,
   input: { name?: string; code?: string; division_id?: string }
 ) {
+  const payload: Record<string, any> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.code !== undefined) payload.code = input.code;
+  if (input.division_id !== undefined) payload.division_id = input.division_id;
+
   const { data, error } = await supabase
     .from('units')
-    .update({
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.code !== undefined ? { code: input.code } : {}),
-      ...(input.division_id !== undefined ? { division_id: input.division_id } : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(payload) // no updated_at
     .eq('id', id)
     .select('*')
     .single();
