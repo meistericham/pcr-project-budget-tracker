@@ -23,7 +23,7 @@ import DatabaseSetup from './DatabaseSetup';
 import DatabaseStatus from './DatabaseStatus';
 import GoogleSheetsIntegration from './GoogleSheetsIntegration'; 
 import PasswordChangeModal from './PasswordChangeModal';
-import NotificationTest from './NotificationTest';
+
 
 const SettingsView = () => {
   const {
@@ -457,7 +457,34 @@ const SettingsView = () => {
         </div>
       </div>
 
-      <NotificationTest />
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notification Types</h3>
+        </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+              <h5 className="font-medium text-gray-900 dark:text-white mb-2">Project Notifications</h5>
+              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <li>• Project created/updated</li>
+                <li>• Project completed</li>
+                <li>• User assignments</li>
+                <li>• Status changes</li>
+              </ul>
+            </div>
+            <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+              <h5 className="font-medium text-gray-900 dark:text-white mb-2">Budget Notifications</h5>
+              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <li>• Budget alerts</li>
+                <li>• Budget code alerts</li>
+                <li>• New budget entries</li>
+                <li>• Threshold warnings</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
