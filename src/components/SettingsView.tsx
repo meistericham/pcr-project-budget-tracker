@@ -26,14 +26,30 @@ import PasswordChangeModal from './PasswordChangeModal';
 import NotificationTest from './NotificationTest';
 
 const SettingsView = () => {
-  const { settings, updateSettings, divisions, units, addDivision, deleteDivision, addUnit, deleteUnit } = useApp();
+  const {
+    settings, updateSettings,
+    divisions, units,
+    addDivision, deleteDivision,
+    addUnit, deleteUnit,
+    renameDivision, renameUnit
+  } = useApp();
   const { allowed: isSA } = useIsSuperAdmin();
   const { theme, setTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'general' | 'budget' | 'notifications' | 'security' | 'backup' | 'database' | 'integrations' | 'categories'>('general');
+
+  const [activeTab, setActiveTab] = useState<
+    'general' | 'budget' | 'notifications' | 'security' | 'backup' | 'database' | 'integrations' | 'categories'
+  >('general');
+
   const [newDivisionName, setNewDivisionName] = useState('');
   const [newUnit, setNewUnit] = useState({ name: '', divisionId: '' });
   const [hasChanges, setHasChanges] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // Inline rename state
+  const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
+  const [divisionNameDraft, setDivisionNameDraft] = useState('');
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [unitNameDraft, setUnitNameDraft] = useState('');
 
   const [formData, setFormData] = useState({
     companyName: settings.companyName,
@@ -159,7 +175,7 @@ const SettingsView = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date Format
             </label>
             <select
@@ -339,14 +355,14 @@ const SettingsView = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Maximum Project Duration (Days)
           </label>
-          <input
-            type="number"
-            min="1"
-            max="3650"
-            value={formData.maxProjectDuration}
-            onChange={(e) => handleInputChange('maxProjectDuration', parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          />
+            <input
+              type="number"
+              min="1"
+              max="3650"
+              value={formData.maxProjectDuration}
+              onChange={(e) => handleInputChange('maxProjectDuration', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
         </div>
       </div>
 
@@ -440,8 +456,7 @@ const SettingsView = () => {
           </label>
         </div>
       </div>
-      
-      {/* Notification Test Panel */}
+
       <NotificationTest />
     </div>
   );
@@ -482,9 +497,8 @@ const SettingsView = () => {
 
   const renderDatabaseSettings = () => (
     <div className="space-y-6">
-      {/* Database Status */}
       <DatabaseStatus />
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
@@ -501,11 +515,9 @@ const SettingsView = () => {
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
-        
         <div className="space-y-4">
           <div className="space-y-3">
             <h4 className="font-medium text-gray-900 dark:text-white">Available Database Options:</h4>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                 <h5 className="font-medium text-gray-900 dark:text-white mb-2">Supabase (Recommended)</h5>
@@ -517,7 +529,6 @@ const SettingsView = () => {
                   <li>• Row-level security</li>
                 </ul>
               </div>
-              
               <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                 <h5 className="font-medium text-gray-900 dark:text-white mb-2">Google Sheets (Available)</h5>
                 <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
@@ -537,22 +548,7 @@ const SettingsView = () => {
     </div>
   );
 
-  const renderIntegrationsSettings = () => (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <FileSpreadsheet className="h-5 w-5 text-green-600 dark:text-green-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Third-Party Integrations</h3>
-        </div>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Connect your PCR Tracker with external services to enhance functionality and streamline workflows.
-        </p>
-      </div>
-
-      <GoogleSheetsIntegration />
-    </div>
-  );
-
+  // ---- NEW: Categories (Divisions & Units) with inline rename ----
   const renderCategorySettings = () => (
     <div className="space-y-6">
       {/* Divisions */}
@@ -564,6 +560,7 @@ const SettingsView = () => {
           </div>
           {!isSuperAdmin && <span className="text-xs text-gray-500">Super Admin only</span>}
         </div>
+
         {isSuperAdmin && (
           <div className="flex items-center space-x-2 mb-4">
             <input
@@ -574,17 +571,69 @@ const SettingsView = () => {
               placeholder="New division name"
             />
             <button
-              onClick={() => { if (newDivisionName.trim()) { addDivision({ name: newDivisionName.trim(), createdBy: '1' }); setNewDivisionName(''); } }}
+              onClick={() => {
+                if (newDivisionName.trim()) {
+                  addDivision({ name: newDivisionName.trim(), createdBy: '1' });
+                  setNewDivisionName('');
+                }
+              }}
               className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >Add</button>
+            >
+              Add
+            </button>
           </div>
         )}
+
         <ul className="divide-y divide-gray-200 dark:divide-gray-700">
           {divisions.map(d => (
             <li key={d.id} className="flex items-center justify-between py-2">
-              <span className="text-sm text-gray-900 dark:text-white">{d.name}</span>
-              {isSuperAdmin && (
-                <button onClick={() => deleteDivision(d.id)} className="text-xs text-red-600 hover:underline">Delete</button>
+              {editingDivisionId === d.id ? (
+                <div className="flex items-center w-full">
+                  <input
+                    value={divisionNameDraft}
+                    onChange={(e) => setDivisionNameDraft(e.target.value)}
+                    className="flex-1 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    onClick={async () => {
+                      const name = divisionNameDraft.trim();
+                      if (name) await renameDivision(d.id, name);
+                      setEditingDivisionId(null);
+                    }}
+                    className="ml-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingDivisionId(null)}
+                    className="ml-2 px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-sm text-gray-900 dark:text-white">{d.name}</span>
+                  {isSuperAdmin && (
+                    <div className="space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingDivisionId(d.id);
+                          setDivisionNameDraft(d.name);
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => deleteDivision(d.id)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </li>
           ))}
@@ -597,6 +646,7 @@ const SettingsView = () => {
           <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Manage Units</h3>
         </div>
+
         {isSuperAdmin && (
           <div className="grid grid-cols-2 gap-2 mb-4">
             <input
@@ -616,18 +666,75 @@ const SettingsView = () => {
             </select>
             <div className="col-span-2">
               <button
-                onClick={() => { if (newUnit.name.trim() && newUnit.divisionId) { addUnit({ name: newUnit.name.trim(), divisionId: newUnit.divisionId, createdBy: '1' }); setNewUnit({ name: '', divisionId: '' }); } }}
+                onClick={() => {
+                  if (newUnit.name.trim() && newUnit.divisionId) {
+                    addUnit({ name: newUnit.name.trim(), divisionId: newUnit.divisionId, createdBy: '1' });
+                    setNewUnit({ name: '', divisionId: '' });
+                  }
+                }}
                 className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >Add Unit</button>
+              >
+                Add Unit
+              </button>
             </div>
           </div>
         )}
+
         <ul className="divide-y divide-gray-200 dark:divide-gray-700">
           {units.map(u => (
             <li key={u.id} className="flex items-center justify-between py-2">
-              <span className="text-sm text-gray-900 dark:text-white">{u.name} <span className="text-xs text-gray-500">({divisions.find(d => d.id === u.divisionId)?.name || '—'})</span></span>
-              {isSuperAdmin && (
-                <button onClick={() => deleteUnit(u.id)} className="text-xs text-red-600 hover:underline">Delete</button>
+              {editingUnitId === u.id ? (
+                <div className="flex items-center w-full">
+                  <input
+                    value={unitNameDraft}
+                    onChange={(e) => setUnitNameDraft(e.target.value)}
+                    className="flex-1 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    onClick={async () => {
+                      const name = unitNameDraft.trim();
+                      if (name) await renameUnit(u.id, name);
+                      setEditingUnitId(null);
+                    }}
+                    className="ml-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingUnitId(null)}
+                    className="ml-2 px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-sm text-gray-900 dark:text-white">
+                    {u.name}{' '}
+                    <span className="text-xs text-gray-500">
+                      ({divisions.find(d => d.id === u.divisionId)?.name || '—'})
+                    </span>
+                  </span>
+                  {isSuperAdmin && (
+                    <div className="space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingUnitId(u.id);
+                          setUnitNameDraft(u.name);
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => deleteUnit(u.id)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </li>
           ))}
@@ -689,7 +796,7 @@ const SettingsView = () => {
             {activeTab === 'notifications' && renderNotificationSettings()}
             {activeTab === 'backup' && renderBackupSettings()}
             {activeTab === 'database' && renderDatabaseSettings()}
-            {activeTab === 'integrations' && renderIntegrationsSettings()}
+            {activeTab === 'integrations' && renderNotificationSettings()}
             {activeTab === 'categories' && renderCategorySettings()}
           </div>
         </div>
