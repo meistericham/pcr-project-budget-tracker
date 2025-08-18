@@ -68,7 +68,7 @@ interface AppContextType {
 
   // Users
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
-  updateUser: (id: string, updates: Partial<User>) => Promise<void>;
+  updateUser: (id: string, updates: Partial<User>) => Promise<User>;
   deleteUser: (id: string) => Promise<void>;
 
   // Budget codes
@@ -1151,14 +1151,35 @@ const renameUnit = async (id: string, newName: string) => {
     );
   };
 
-  const updateUser = async (id: string, updates: Partial<User>) => {
-    let next: User | undefined;
+    const updateUser = async (id: string, updates: Partial<User>) => {
     if (useServerDb) {
-      next = await userService.update(id, updates);
+      try {
+        // Call the service and get the authoritative row from DB
+        const saved = await userService.update(id, updates);
+
+        // Update local state with the fresh row
+        setUsers(prev =>
+          prev.map(u => (u.id === id ? saved : u))
+        );
+
+        // If the current user updated themselves, refresh profile
+        if (user?.id === id) {
+          // Note: refreshCurrentUser is available in AuthContext, but we can't call it here
+          // The calling component should handle profile refresh if needed
+        }
+
+        return saved;
+      } catch (err) {
+        console.error('[AppContext.updateUser] Failed to update user:', err);
+        throw err;
+      }
     } else {
-      next = undefined;
+      // Local (mock) mode
+      setUsers(prev =>
+        prev.map(u => (u.id === id ? { ...u, ...updates } : u))
+      );
+      return { ...(users.find(u => u.id === id) as User), ...updates };
     }
-    setUsers(prev => prev.map(u => (u.id === id ? (next || { ...u, ...updates }) : u)));
   };
 
   const deleteUser = async (id: string) => {

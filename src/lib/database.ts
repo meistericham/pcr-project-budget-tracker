@@ -33,9 +33,10 @@ const transformUser = (dbUser: any): User => ({
   email: dbUser.email,
   role: dbUser.role,
   initials: dbUser.initials,
-  divisionId: dbUser.division_id,
-  unitId: dbUser.unit_id,
-  createdAt: dbUser.created_at
+  createdAt: dbUser.created_at,
+  // 👇 make sure your User type has these (camelCase)
+  divisionId: dbUser.division_id ?? null,
+  unitId: dbUser.unit_id ?? null,
 });
 
 const transformProject = (dbProject: any): Project => ({
