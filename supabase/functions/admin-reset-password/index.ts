@@ -18,10 +18,10 @@ Deno.serve(async (req) => {
   try {
     // Read environment variables from Supabase secrets
     const url = Deno.env.get('SB_URL')
-    const anon = Deno.env.get('SB_ANON_KEY')
     const service = Deno.env.get('SB_SERVICE_ROLE_KEY')
+    const anon = Deno.env.get('SB_ANON_KEY')
     
-    if (!url || !anon || !service) {
+    if (!url || !service || !anon) {
       return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -32,48 +32,42 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization') ?? ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
 
-    // Check if using service_role directly (skip role validation)
-    const isServiceCaller = token === service
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Create admin client for user operations
     const supabaseAdmin = createClient(url, service)
 
-    // If not service caller, validate user token and super_admin role
-    if (!isServiceCaller) {
-      if (!token) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
+    // Create user client with provided token to verify caller
+    const supabaseUser = createClient(url, anon, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    })
 
-      // Create user client with provided token
-      const supabaseUser = createClient(url, anon, {
-        global: { headers: { Authorization: `Bearer ${token}` } }
+    // Verify token is valid and get user
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser()
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    }
 
-      // Verify token is valid and get user
-      const { data: userData, error: userError } = await supabaseUser.auth.getUser()
-      if (userError || !userData?.user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
+    // Check user role in users table (not profiles)
+    const { data: profile, error: profileError } = await supabaseUser
+      .from('users')
+      .select('role')
+      .eq('id', userData.user.id)
+      .single()
 
-      // Check user role in profiles table
-      const { data: profile, error: profileError } = await supabaseUser
-        .from('profiles')
-        .select('role')
-        .eq('id', userData.user.id)
-        .single()
-
-      if (profileError || !profile || profile.role !== 'super_admin') {
-        return new Response(JSON.stringify({ error: 'Forbidden: super_admin only' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
+    if (profileError || !profile || profile.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden: super_admin only' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // Parse and validate request body
@@ -88,7 +82,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Find target user by email (paginate through users)
+    // Try to find existing Auth user by email
     let targetUserId: string | null = null
     const pageSize = 200
     
@@ -118,23 +112,32 @@ Deno.serve(async (req) => {
       if (data.users.length < pageSize) break
     }
 
-    if (!targetUserId) {
-      return new Response(JSON.stringify({ error: 'User not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (targetUserId) {
+      // User exists in Auth - update password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        password: newPassword
       })
-    }
 
-    // Update user password using admin privileges
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
-      password: newPassword
-    })
-
-    if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    } else {
+      // User doesn't exist in Auth - create new user
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: newPassword,
+        email_confirm: true
       })
+
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     // Success response
