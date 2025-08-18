@@ -18,8 +18,8 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
     name: '',
     email: '',
     role: 'user' as UserType['role'],
-    divisionId: '',
-    unitId: ''
+    division_id: '',
+    unit_id: ''
   });
 
   useEffect(() => {
@@ -28,8 +28,8 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        divisionId: user.divisionId || '',
-        unitId: user.unitId || ''
+        division_id: user.divisionId || '',
+        unit_id: user.unitId || ''
       });
     }
   }, [user]);
@@ -47,7 +47,7 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
     e.preventDefault();
     
     // Add authorization check BEFORE submitting
-    if ((formData.divisionId !== user?.divisionId || formData.unitId !== user?.unitId) && 
+    if ((formData.division_id !== user?.divisionId || formData.unit_id !== user?.unitId) && 
         profile?.role !== 'super_admin') {
       alert('Permission denied: Only super administrators can change division or unit assignments.');
       return;
@@ -57,8 +57,8 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
       name: formData.name,
       email: formData.email,
       role: formData.role,
-      divisionId: formData.divisionId || undefined,
-      unitId: formData.unitId || undefined,
+      division_id: formData.division_id || undefined,
+      unit_id: formData.unit_id || undefined,
       initials: formData.name
         .split(' ')
         .map(n => n[0])
@@ -73,7 +73,7 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
         
         // If updating the current user and division/unit changed, refresh their profile
         if (currentUser?.id === user.id && 
-            (userData.divisionId !== user.divisionId || userData.unitId !== user.unitId)) {
+            (userData.division_id !== user.divisionId || userData.unit_id !== user.unitId)) {
           await refreshCurrentUser();
         }
         
@@ -243,12 +243,12 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
               Division
             </label>
             <select
-              value={formData.divisionId}
+              value={formData.division_id}
               onChange={(e) => {
                 setFormData(prev => ({ 
                   ...prev, 
-                  divisionId: e.target.value,
-                  unitId: '' // Reset unit when division changes
+                  division_id: e.target.value,
+                  unit_id: '' // Reset unit when division changes
                 }));
               }}
               disabled={profile?.role !== 'super_admin'}
@@ -276,14 +276,14 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
               Unit
             </label>
             <select
-              value={formData.unitId}
-              onChange={(e) => setFormData(prev => ({ ...prev, unitId: e.target.value }))}
-              disabled={!formData.divisionId || profile?.role !== 'super_admin'}
+              value={formData.unit_id}
+              onChange={(e) => setFormData(prev => ({ ...prev, unit_id: e.target.value }))}
+              disabled={!formData.division_id || profile?.role !== 'super_admin'}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Select Unit (Optional)</option>
               {units
-                .filter(unit => !formData.divisionId || unit.divisionId === formData.divisionId)
+                .filter(unit => !formData.division_id || unit.divisionId === formData.division_id)
                 .map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.name}
@@ -291,7 +291,7 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
                 ))}
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {!formData.divisionId 
+              {!formData.division_id 
                 ? 'Select a division first to assign units'
                 : profile?.role === 'super_admin'
                 ? 'Assign user to a specific unit within the selected division'
