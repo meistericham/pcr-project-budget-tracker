@@ -139,21 +139,34 @@ export const userService = {
   },
 
   async update(id: string, updates: Partial<User>): Promise<User> {
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        name: updates.name,
-        email: updates.email,
-        role: updates.role,
-        initials: updates.initials,
-        division_id: updates.divisionId,
-        unit_id: updates.unitId
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return transformUser(data);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          name: updates.name,
+          email: updates.email,
+          role: updates.role,
+          initials: updates.initials,
+          division_id: updates.divisionId,
+          unit_id: updates.unitId
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    
+      if (error) {
+        // Handle specific authorization error
+        if (error.message?.includes('Only super_admin can change division_id or unit_id')) {
+          throw new Error('Permission denied: Only super administrators can change division or unit assignments.');
+        }
+        throw error;
+      }
+      
+      return transformUser(data);
+    } catch (err) {
+      console.error('[userService.update] Error:', err);
+      throw err;
+    }
   },
 
   async delete(id: string): Promise<void> {
