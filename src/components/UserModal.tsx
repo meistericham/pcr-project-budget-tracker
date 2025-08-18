@@ -34,6 +34,15 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[DEBUG] Current user:', currentUser);
+      console.log('[DEBUG] Current profile:', profile);
+      console.log('[DEBUG] Profile role:', profile?.role);
+      console.log('[DEBUG] Is super_admin?', profile?.role === 'super_admin');
+    }
+  }, [currentUser, profile]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
