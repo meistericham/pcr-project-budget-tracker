@@ -5,6 +5,12 @@
 - [ ] After policy changes, UI may require a hard refresh to reflect RLS (documented)
 
 ## User Division/Unit Assignment 🚨 CRITICAL
+- [x] **Unit/Division not updating from UserModal**
+  - **Title**: Unit/Division not updating from UserModal
+  - **Symptoms**: PATCH 200 OK but division/unit unchanged in UI and DB
+  - **Root Cause**: UserModal sent snake_case keys; AppContext used stale fallback; no profile refresh for current user
+  - **Fix**: CamelCase in modal, snake_case mapping in userService.update, AppContext uses saved row + refreshCurrentUser
+  - **Status**: Fixed (date: 2024-12-19)
 - [ ] **Field Mapping Mismatch**: UserModal.tsx uses `division_id`/`unit_id` (snake_case) but User type expects `divisionId`/`unitId` (camelCase)
   - **Location**: `src/components/UserModal.tsx` lines 25-26, 75-76
   - **Impact**: Division/unit assignments fail to save correctly

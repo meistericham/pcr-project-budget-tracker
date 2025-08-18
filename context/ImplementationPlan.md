@@ -27,9 +27,14 @@
 **Goals**: Complete user role system with division/unit assignment controls
 
 ### Subtasks:
-- [ ] **CRITICAL**: Fix field mapping mismatch in UserModal.tsx (division_id → divisionId, unit_id → unitId)
-- [ ] **CRITICAL**: Fix AppContext updateUser state update logic to use server response data
-- [ ] **CRITICAL**: Add profile refresh after user updates to prevent stale division/unit data
+- [x] **CRITICAL**: Fix field mapping mismatch in UserModal.tsx (division_id → divisionId, unit_id → unitId)
+- [x] **CRITICAL**: Fix AppContext updateUser state update logic to use server response data
+- [x] **CRITICAL**: Add profile refresh after user updates to prevent stale division/unit data
+- [ ] Verify UserModal sends { divisionId, unitId } (camelCase)
+- [ ] Verify userService.update maps to { division_id, unit_id } and allows null clears
+- [ ] Ensure AppContext.updateUser uses DB-saved row and refreshes current user if self-updated
+- [ ] Add console logs for troubleshooting
+- [ ] Quick manual test steps (open modal, change div/unit, submit, confirm network payload, confirm UI updates)
 - [ ] Implement user division/unit assignment (super_admin only)
 - [ ] Add user profile management with role-based restrictions
 - [ ] Create user invitation system for admins
