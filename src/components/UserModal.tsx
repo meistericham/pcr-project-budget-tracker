@@ -66,9 +66,10 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose }) => {
         .toUpperCase()
         .slice(0, 2)
     };
-
+    
     if (user) {
       try {
+        console.log('[UserModal] submitting userData →', userData);
         await updateUser(user.id, userData);
         
         // If updating the current user and division/unit changed, refresh their profile

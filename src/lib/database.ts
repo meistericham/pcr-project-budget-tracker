@@ -150,7 +150,9 @@ export const userService = {
         ...(updates.divisionId !== undefined ? { division_id: updates.divisionId } : {}), // can be string or null
         ...(updates.unitId !== undefined ? { unit_id: updates.unitId } : {}),             // can be string or null
       };
-  
+      console.log('[userService.update] id →', id);
+      console.log('[userService.update] payload →', payload);
+      
       const { data, error } = await supabase
         .from('users')
         .update(payload)
