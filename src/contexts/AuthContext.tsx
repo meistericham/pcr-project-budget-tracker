@@ -192,33 +192,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // super_admin resets another user's password via Edge Function
-const adminResetPassword = async (email: string, newPassword: string) => {
-  setError(null);
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess?.session?.access_token;
-  if (!token) throw new Error('Not authenticated');
-
-  // Build the edge functions base URL from your env/project URL
-  const base = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-  const fnUrl = `${base}/functions/v1/admin-reset-password`;
-
-  const res = await fetch(fnUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`, // client user JWT
-    },
-    body: JSON.stringify({ email: email.trim().toLowerCase(), newPassword }),
-  });
-
-  // Better error surface
-  const text = await res.text();
-  let payload: any = text;
-  try { payload = JSON.parse(text); } catch {}
-  if (!res.ok) {
-    throw new Error(payload?.error || `Failed (HTTP ${res.status})`);
-  }
-};
+  const adminResetPassword = async (email: string, newPassword: string) => {
+    setError(null);
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      body: { email: email.trim().toLowerCase(), newPassword }
+    });
+    
+    if (error) throw new Error(error.message);
+  };
 
   return (
     <AuthContext.Provider

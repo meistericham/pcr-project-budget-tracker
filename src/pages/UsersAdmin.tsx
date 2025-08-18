@@ -26,20 +26,11 @@ function ResetPasswordButton({ email }: { email: string }) {
         return;
       }
 
-      const res = await fetch(
-        'https://ddqisrmoleupgqigmbhr.supabase.co/functions/v1/admin-reset-password',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email, newPassword })
-        }
-      );
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || `Reset failed (${res.status})`);
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { email, newPassword }
+      });
+      
+      if (error) throw new Error(error.message);
 
       setMsg('Reset OK');
     } catch (e: any) {

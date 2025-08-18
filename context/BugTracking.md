@@ -23,6 +23,17 @@
   - **Impact**: Current user sees stale division/unit data after self-updates
   - **Fix**: Call refreshCurrentUser() after successful user updates
 
+## Admin Password Reset Edge Function 🚨 CRITICAL
+- [x] **Hardcoded URLs instead of SDK calls**: Multiple files use manual fetch with hardcoded URLs
+  - **Location**: `src/contexts/AuthContext.tsx` line 202, `src/pages/UsersAdmin.tsx` line 29
+  - **Impact**: Function calls won't work if project URL changes; inconsistent with Supabase best practices
+  - **Fix**: Replace with `supabase.functions.invoke('admin-reset-password', ...)`
+  - **Status**: Fixed (date: 2024-12-19)
+- [x] **Edge Function properly implemented**: Function exists and has role validation
+  - **Status**: ✅ Function deployed and configured correctly
+  - **Status**: ✅ Role validation via JWT and profiles table check
+  - **Status**: ✅ CORS headers and error handling implemented
+
 ## Fixed / Verified
 - [x] Division/Unit updates blocked unless super_admin (trigger)
 - [x] Projects visibility by assignment/division
