@@ -40,7 +40,9 @@ Deno.serve(async (req) => {
     }
 
     // Create admin client for user operations
+    console.log(`[FUNCTION] Creating admin client with URL: ${url}`)
     const supabaseAdmin = createClient(url, service)
+    console.log(`[FUNCTION] Admin client created successfully`)
 
     // Create user client with provided token to verify caller
     const supabaseUser = createClient(url, anon, {
@@ -86,6 +88,8 @@ Deno.serve(async (req) => {
     let targetUserId: string | null = null
     const pageSize = 200
     
+    console.log(`[FUNCTION] Looking for Auth user with email: ${email}`)
+    
     for (let page = 1; page <= 10 && !targetUserId; page++) { // Limit to 10 pages max
       const { data, error } = await supabaseAdmin.auth.admin.listUsers({ 
         page, 
@@ -93,6 +97,7 @@ Deno.serve(async (req) => {
       })
       
       if (error) {
+        console.error(`[FUNCTION] User lookup failed on page ${page}:`, error)
         return new Response(JSON.stringify({ error: `User lookup failed: ${error.message}` }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -105,6 +110,7 @@ Deno.serve(async (req) => {
       
       if (matchedUser) {
         targetUserId = matchedUser.id
+        console.log(`[FUNCTION] Found existing Auth user: ${targetUserId}`)
         break
       }
 
@@ -114,27 +120,42 @@ Deno.serve(async (req) => {
 
     if (targetUserId) {
       // User exists in Auth - update password
+      console.log(`[FUNCTION] Updating password for existing user: ${targetUserId}`)
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
         password: newPassword
       })
 
       if (updateError) {
+        console.error(`[FUNCTION] Password update failed:`, updateError)
         return new Response(JSON.stringify({ error: updateError.message }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
+      console.log(`[FUNCTION] Password updated successfully`)
     } else {
       // User doesn't exist in Auth - create new user
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: newPassword,
-        email_confirm: true
-      })
+      console.log(`[FUNCTION] Creating new Auth user for email: ${email}`)
+      
+      try {
+        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password: newPassword,
+          email_confirm: true
+        })
 
-      if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), {
-          status: 400,
+        if (createError) {
+          console.error(`[FUNCTION] User creation failed:`, createError)
+          return new Response(JSON.stringify({ error: createError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        console.log(`[FUNCTION] New Auth user created successfully: ${newUser?.user?.id}`)
+      } catch (createErr) {
+        console.error(`[FUNCTION] Unexpected error during user creation:`, createErr)
+        return new Response(JSON.stringify({ error: `User creation failed: ${(createErr as Error).message}` }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
