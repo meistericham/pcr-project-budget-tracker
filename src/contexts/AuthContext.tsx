@@ -23,6 +23,7 @@ interface AuthContextType {
   // server-side (edge function) admin reset by super_admin
   adminResetPassword: (email: string, newPassword: string) => Promise<void>;
   reloadProfile: () => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
 
   loading: boolean;
   error: string | null;
@@ -122,6 +123,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Refresh current user profile from database (useful after updates)
+  const refreshCurrentUser = async (): Promise<void> => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) {
+        console.error('[AUTH] Failed to refresh current user:', error);
+        return;
+      }
+      
+      // Update profile with fresh data including division_id and unit_id
+      const freshProfile = {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        initials: data.initials,
+        division: data.division_id,
+        unit: data.unit_id
+      };
+      
+      setProfile(freshProfile);
+      setRole((data.role as Role) ?? null);
+      
+      if (import.meta.env.DEV) {
+        console.debug('[AUTH] Current user refreshed:', freshProfile);
+      }
+    } catch (err) {
+      console.error('[AUTH] Error refreshing current user:', err);
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -189,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfileName,
         adminResetPassword,
         reloadProfile: syncProfile,
+        refreshCurrentUser,
         loading,
         error
       }}

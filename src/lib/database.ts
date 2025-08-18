@@ -33,6 +33,8 @@ const transformUser = (dbUser: any): User => ({
   email: dbUser.email,
   role: dbUser.role,
   initials: dbUser.initials,
+  divisionId: dbUser.division_id,
+  unitId: dbUser.unit_id,
   createdAt: dbUser.created_at
 });
 
@@ -126,7 +128,9 @@ export const userService = {
         name: user.name,
         email: user.email,
         role: user.role,
-        initials: user.initials
+        initials: user.initials,
+        division_id: user.divisionId,
+        unit_id: user.unitId
       })
       .select()
       .single();
@@ -141,7 +145,9 @@ export const userService = {
         name: updates.name,
         email: updates.email,
         role: updates.role,
-        initials: updates.initials
+        initials: updates.initials,
+        division_id: updates.divisionId,
+        unit_id: updates.unitId
       })
       .eq('id', id)
       .select()
