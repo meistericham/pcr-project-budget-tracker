@@ -80,6 +80,8 @@ export interface Database {
           role: 'super_admin' | 'admin' | 'user';
           initials: string;
           created_at: string;
+          division_id: string | null;
+          unit_id: string | null;
         };
         Insert: {
           id?: string;
@@ -88,6 +90,8 @@ export interface Database {
           role: 'super_admin' | 'admin' | 'user';
           initials: string;
           created_at?: string;
+          division_id: string | null;
+          unit_id: string | null;
         };
         Update: {
           id?: string;
@@ -96,6 +100,8 @@ export interface Database {
           role?: 'super_admin' | 'admin' | 'user';
           initials?: string;
           created_at?: string;
+          division_id?: string | null;
+          unit_id?: string | null;
         };
       };
       budget_codes: {

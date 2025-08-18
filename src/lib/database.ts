@@ -140,28 +140,29 @@ export const userService = {
 
   async update(id: string, updates: Partial<User>): Promise<User> {
     try {
+      // Build payload: include only provided fields; allow explicit null to clear org fields
+      const payload: Record<string, any> = {
+        ...(updates.name !== undefined ? { name: updates.name } : {}),
+        ...(updates.email !== undefined ? { email: updates.email } : {}),
+        ...(updates.role !== undefined ? { role: updates.role } : {}),
+        ...(updates.initials !== undefined ? { initials: updates.initials } : {}),
+        ...(updates.divisionId !== undefined ? { division_id: updates.divisionId } : {}), // can be string or null
+        ...(updates.unitId !== undefined ? { unit_id: updates.unitId } : {}),             // can be string or null
+      };
+  
       const { data, error } = await supabase
         .from('users')
-        .update({
-          name: updates.name,
-          email: updates.email,
-          role: updates.role,
-          initials: updates.initials,
-          division_id: updates.divisionId,
-          unit_id: updates.unitId
-        })
+        .update(payload)
         .eq('id', id)
-        .select()
+        .select('*')
         .single();
-    
+  
       if (error) {
-        // Handle specific authorization error
         if (error.message?.includes('Only super_admin can change division_id or unit_id')) {
           throw new Error('Permission denied: Only super administrators can change division or unit assignments.');
         }
         throw error;
       }
-      
       return transformUser(data);
     } catch (err) {
       console.error('[userService.update] Error:', err);
