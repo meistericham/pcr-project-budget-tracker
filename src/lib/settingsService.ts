@@ -1,6 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(import.meta.env.VITE_SUPABASE_URL!, import.meta.env.VITE_SUPABASE_ANON_KEY!);
+import { supabase } from './supabase';
 
 export async function getSettings(): Promise<any> {
   const { data, error } = await supabase

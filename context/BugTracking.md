@@ -42,6 +42,8 @@
 
 **Note**: Fixed invalid hook call (#321) by removing hook usage from non-hook code (updateSettings/services). Hardened server settings upsert and role guards.
 
+**Note**: Fixed "Multiple GoTrueClient instances detected" warning by refactoring settingsService.ts to use shared Supabase client singleton instead of creating duplicate clients.
+
 ## Enhancement: Step A — Load settings from Supabase in server mode (2024-12-19)
 - **Title**: Added a read path to fetch app settings from app_settings singleton row
 - **Summary**: Implemented Step A of settings persistence enhancement - loading settings from Supabase in server mode
