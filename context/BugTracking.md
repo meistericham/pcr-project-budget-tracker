@@ -33,6 +33,10 @@
   - **Status**: ✅ Function deployed and configured correctly
   - **Status**: ✅ Role validation via JWT and profiles table check
   - **Status**: ✅ CORS headers and error handling implemented
+- [x] **Edge function previously returned 404/'User not found' due to mismatched auth expectations**: Function was rejecting valid tokens
+  - **Root Cause**: Function tried to verify JWT tokens but had conflicting auth logic
+  - **Fix**: Switched to service-role inside function, added dual authorization (JWT super_admin or X-Admin-Secret), deployed with --no-verify-jwt
+  - **Status**: Fixed (date: 2024-12-19)
 
 ## Fixed / Verified
 - [x] Division/Unit updates blocked unless super_admin (trigger)
