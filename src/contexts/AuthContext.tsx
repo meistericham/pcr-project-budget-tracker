@@ -194,11 +194,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // super_admin resets another user's password via Edge Function
   const adminResetPassword = async (email: string, newPassword: string) => {
     setError(null);
-    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-      body: { email: email.trim().toLowerCase(), newPassword }
-    });
     
-    if (error) throw new Error(error.message);
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      const res = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), newPassword }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(id);
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }));
+        throw new Error(`${errorData.error} (${errorData.code || 'NO_CODE'})`);
+      }
+      
+      const data = await res.json();
+      console.log('[AUTH] Password reset successful:', data);
+      
+    } catch (err: any) {
+      clearTimeout(id);
+      
+      if (err.name === 'AbortError') {
+        throw new Error('Password service timed out, please retry');
+      }
+      
+      throw new Error(err.message || 'Password reset failed');
+    }
   };
 
   return (

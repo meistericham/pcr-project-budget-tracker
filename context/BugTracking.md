@@ -45,12 +45,38 @@
   - **Root Cause**: supabase-js v2 doesn't have `getUserByEmail` method in admin API; function was trying to use deprecated/removed method
   - **Fix**: Completely rewrote function to use correct v2 API methods: `admin.auth.admin.listUsers()` for search, `updateUserById()` for updates, `createUser()` for new users
   - **Status**: Fixed (date: 2024-12-19)
+- [x] **Edge Function hardening and preflight optimization**: Improved reliability and performance
+  - **Root Cause**: OPTIONS preflight was slow, error handling lacked structure, logging was insufficient
+  - **Fix**: Fast OPTIONS preflight (<50ms), structured logging with request IDs, error codes, timeout handling, removed JWT dependency
+  - **Status**: Fixed (date: 2024-12-19)
 
 ## UI/UX Issues
 - [x] **UserModal content exceeds viewport height**: Form content taller than window, no scrolling possible
   - **Root Cause**: Modal container had no height constraints or overflow handling
   - **Fix**: Restructured modal layout with `max-h-[90vh]`, `flex flex-col`, and `overflow-y-auto` on form body
   - **Status**: Fixed (date: 2024-12-19)
+
+## Regression Test / How to Verify
+
+### Edge Function Performance & Reliability
+- [ ] **OPTIONS preflight**: Returns 204 in Network tab within <100ms, never 504 Gateway Timeout
+- [ ] **New user creation**: Returns 201 status, UI closes, list refreshes, success toast shows
+- [ ] **Password update**: Returns 200 status for existing users
+- [ ] **Error handling**: Failures show succinct error with code (e.g., "Update password failed (UPDATE_PASSWORD)")
+- [ ] **Logging**: Edge Function logs show request ID and step-by-step progress
+
+### Frontend Integration
+- [ ] **Timeout handling**: 10s timeout shows "Password service timed out, please retry"
+- [ ] **CORS**: No CORS errors in browser console
+- [ ] **Headers**: Only sends Content-Type: application/json (no Authorization)
+- [ ] **Error display**: User-friendly error messages with codes in parentheses
+
+### Test Scenarios
+1. **Create new user** with unique email → should return 201, close modal, refresh list
+2. **Update existing user** password → should return 200, show success
+3. **Invalid input** (missing email/password) → should return 400 with BAD_INPUT code
+4. **Network timeout** → should abort after 10s and show timeout message
+5. **Server errors** → should show error message with appropriate code
 
 ## Fixed / Verified
 - [x] Division/Unit updates blocked unless super_admin (trigger)
