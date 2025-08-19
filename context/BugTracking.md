@@ -41,6 +41,10 @@
   - **Root Cause**: Edge Function CORS headers missing `x-client-info` that Supabase client automatically adds
   - **Fix**: Updated CORS helper to include `authorization, apikey, content-type, x-client-info, x-admin-secret` headers
   - **Status**: Fixed (date: 2024-12-19)
+- [x] **500 error: "adminClient.auth.admin.getUserByEmail is not a function"**: Function using non-existent API method
+  - **Root Cause**: supabase-js v2 doesn't have `getUserByEmail` method in admin API
+  - **Fix**: Implemented `findAuthUserByEmail()` using `admin.auth.admin.listUsers()` and filtering by email
+  - **Status**: Fixed (date: 2024-12-19)
 
 ## Fixed / Verified
 - [x] Division/Unit updates blocked unless super_admin (trigger)
