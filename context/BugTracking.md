@@ -42,8 +42,14 @@
   - **Fix**: Updated CORS helper to include `authorization, apikey, content-type, x-client-info, x-admin-secret` headers
   - **Status**: Fixed (date: 2024-12-19)
 - [x] **500 error: "adminClient.auth.admin.getUserByEmail is not a function"**: Function using non-existent API method
-  - **Root Cause**: supabase-js v2 doesn't have `getUserByEmail` method in admin API
-  - **Fix**: Implemented `findAuthUserByEmail()` using `admin.auth.admin.listUsers()` and filtering by email
+  - **Root Cause**: supabase-js v2 doesn't have `getUserByEmail` method in admin API; function was trying to use deprecated/removed method
+  - **Fix**: Completely rewrote function to use correct v2 API methods: `admin.auth.admin.listUsers()` for search, `updateUserById()` for updates, `createUser()` for new users
+  - **Status**: Fixed (date: 2024-12-19)
+
+## UI/UX Issues
+- [x] **UserModal content exceeds viewport height**: Form content taller than window, no scrolling possible
+  - **Root Cause**: Modal container had no height constraints or overflow handling
+  - **Fix**: Restructured modal layout with `max-h-[90vh]`, `flex flex-col`, and `overflow-y-auto` on form body
   - **Status**: Fixed (date: 2024-12-19)
 
 ## Fixed / Verified

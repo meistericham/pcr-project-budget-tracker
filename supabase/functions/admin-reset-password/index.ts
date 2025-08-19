@@ -5,7 +5,7 @@ const ORIGIN = 'https://pcrtracker.meistericham.com';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -20,86 +20,116 @@ function noContent(status = 204) {
   return new Response(null, { status, headers: CORS_HEADERS });
 }
 
-async function parseBearer(req: Request): Promise<string | null> {
-  const auth = req.headers.get('authorization') || req.headers.get('Authorization');
-  if (!auth || !auth.toLowerCase().startsWith('bearer ')) return null;
-  return auth.slice(7).trim();
-}
-
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return noContent(200);
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  console.log('[admin-reset-password] Function started');
+  
+  // Handle OPTIONS request for CORS preflight
+  if (req.method === 'OPTIONS') {
+    return noContent(204);
+  }
+  
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
+  }
 
   try {
-    const token = await parseBearer(req);
-    if (!token) return json({ error: 'Unauthorized: missing token' }, 401);
-
-    // env
+    // Get environment variables
     const url = Deno.env.get('SB_URL');
     const serviceRole = Deno.env.get('SB_SERVICE_ROLE_KEY');
+    
     if (!url || !serviceRole) {
+      console.error('[admin-reset-password] Missing environment variables');
       return json({ error: 'Server misconfigured: missing SB_URL or SB_SERVICE_ROLE_KEY' }, 500);
     }
 
-    // 1) Client from caller token (to know who is calling)
-    const caller = createClient(url, token);
+    // Create admin client with service role
+    const admin = createClient(url, serviceRole, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
-    // Who is calling?
-    const { data: callerUser, error: callerErr } = await caller.auth.getUser();
-    if (callerErr || !callerUser?.user) return json({ error: 'Unauthorized: invalid token' }, 401);
-
-    // Look up caller's role in public.users
-    const db = createClient(url, serviceRole); // use service role to read users table safely
-    const { data: me, error: meErr } = await db
-      .from('users')
-      .select('id, role')
-      .eq('id', callerUser.user.id)
-      .single();
-
-    if (meErr || !me) return json({ error: 'Forbidden: user not found in users table' }, 403);
-    if (me.role !== 'super_admin') return json({ error: 'Forbidden: super_admin only' }, 403);
-
-    // 2) Read input
+    // Parse request body
     const body = await req.json().catch(() => null) as { email?: string; newPassword?: string } | null;
-    const emailRaw = (body?.email || '').toLowerCase().trim();
+    const email = (body?.email || '').toLowerCase().trim();
     const newPassword = (body?.newPassword || '').trim();
-    if (!emailRaw || !newPassword) return json({ error: 'email and newPassword are required' }, 400);
-
-    // 3) Admin client for auth admin ops
-    const admin = createClient(url, serviceRole);
-
-    // helper: find user by email using listUsers (v2 does not have getUserByEmail)
-    async function findAuthUserByEmail(email: string) {
-      // basic single-page search; expand if you expect >1000 users
-      const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      if (error) throw error;
-      const users = data?.users || [];
-      const match = users.find(u => (u.email || '').toLowerCase() === email.toLowerCase());
-      return match || null;
+    
+    if (!email || !newPassword) {
+      return json({ error: 'email and newPassword are required' }, 400);
     }
 
-    let authUser = await findAuthUserByEmail(emailRaw);
+    console.log(`[admin-reset-password] Processing request for email: ${email}`);
 
-    if (!authUser) {
-      // Create auth user if not exist
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email: emailRaw,
-        password: newPassword,
-        email_confirm: true,
-      });
-      if (createErr) return json({ error: `Create user failed: ${createErr.message}` }, 400);
-      authUser = created.user ?? null;
-      if (!authUser) return json({ error: 'Create user returned no user' }, 500);
-    } else {
+    // Find existing user by email using listUsers
+    const { data: usersData, error: listError } = await admin.auth.admin.listUsers({ 
+      page: 1, 
+      perPage: 1000 
+    });
+    
+    if (listError) {
+      console.error('[admin-reset-password] Error listing users:', listError);
+      return json({ error: `Failed to search users: ${listError.message}` }, 500);
+    }
+
+    const users = usersData?.users || [];
+    const existingUser = users.find(u => (u.email || '').toLowerCase() === email);
+    
+    console.log(`[admin-reset-password] Found ${users.length} users, existing user: ${existingUser ? 'yes' : 'no'}`);
+
+    let userId: string;
+    let status: 'created' | 'updated';
+
+    if (existingUser) {
       // Update password for existing user
-      const { error: updErr } = await admin.auth.admin.updateUserById(authUser.id, {
-        password: newPassword,
+      console.log('[admin-reset-password] Updating existing user password');
+      
+      const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+        password: newPassword
       });
-      if (updErr) return json({ error: `Update password failed: ${updErr.message}` }, 400);
+      
+      if (updateError) {
+        console.error('[admin-reset-password] Error updating user:', updateError);
+        return json({ error: `Update password failed: ${updateError.message}` }, 400);
+      }
+      
+      userId = existingUser.id;
+      status = 'updated';
+      console.log('[admin-reset-password] User password updated successfully');
+    } else {
+      // Create new user
+      console.log('[admin-reset-password] Creating new user');
+      
+      const { data: createData, error: createError } = await admin.auth.admin.createUser({
+        email: email,
+        password: newPassword,
+        email_confirm: true
+      });
+      
+      if (createError) {
+        console.error('[admin-reset-password] Error creating user:', createError);
+        return json({ error: `Create user failed: ${createError.message}` }, 400);
+      }
+      
+      if (!createData?.user) {
+        console.error('[admin-reset-password] Create user returned no user data');
+        return json({ error: 'Create user returned no user data' }, 500);
+      }
+      
+      userId = createData.user.id;
+      status = 'created';
+      console.log('[admin-reset-password] New user created successfully');
     }
 
-    return json({ ok: true, userId: authUser.id });
-  } catch (e: any) {
-    return json({ error: e?.message || 'Unexpected error' }, 500);
+    // Return success response
+    const responseData = { status, userId };
+    const responseStatus = status === 'created' ? 201 : 200;
+    
+    console.log(`[admin-reset-password] Function completed successfully: ${status} user ${userId}`);
+    return json(responseData, responseStatus);
+
+  } catch (error: any) {
+    console.error('[admin-reset-password] Unexpected error:', error);
+    return json({ error: error?.message || 'Unexpected error occurred' }, 500);
   }
 }
