@@ -52,7 +52,7 @@
   - ✅ Server mode gracefully handles settings updates (TODO: implement Supabase persistence)
 
 - **Date**: 2024-12-19
-- **Commit Hash**: (to be filled after commit)
+- **Commit Hash**: 56eb14f
 
 ## Open
 - [ ] Occasionally notifications count > list shown (ensure AppContext `refreshNotifications()` runs on auth change and sets empty arrays)
