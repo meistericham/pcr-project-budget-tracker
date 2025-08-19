@@ -37,6 +37,10 @@
   - **Root Cause**: Function tried to verify JWT tokens but had conflicting auth logic
   - **Fix**: Switched to service-role inside function, added dual authorization (JWT super_admin or X-Admin-Secret), deployed with --no-verify-jwt
   - **Status**: Fixed (date: 2024-12-19)
+- [x] **CORS error blocking frontend calls**: Browser blocked requests due to missing CORS headers
+  - **Root Cause**: Edge Function CORS headers missing `x-client-info` that Supabase client automatically adds
+  - **Fix**: Updated CORS helper to include `authorization, apikey, content-type, x-client-info, x-admin-secret` headers
+  - **Status**: Fixed (date: 2024-12-19)
 
 ## Fixed / Verified
 - [x] Division/Unit updates blocked unless super_admin (trigger)

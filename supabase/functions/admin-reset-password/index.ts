@@ -5,14 +5,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 function cors(headers: Headers = new Headers()) {
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "authorization, x-admin-secret, content-type");
+  headers.set("Access-Control-Allow-Headers", "authorization, apikey, content-type, x-client-info, x-admin-secret");
   return headers;
 }
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: cors() });
+    return new Response("", { status: 200, headers: cors() });
   }
 
   const headers = cors(new Headers({ "Content-Type": "application/json" }));
