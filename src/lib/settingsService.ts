@@ -10,7 +10,7 @@ export class SettingsService {
    * Fetch settings from Supabase
    * @returns Promise<AppSettings | null> - settings if found, null if not found or error
    */
-  static async get(): Promise<AppSettings | null> {
+  static async getSettings(): Promise<AppSettings | null> {
     try {
       if (!isSupabaseConfigured) {
         console.log('[SettingsService] Supabase not configured, returning null');

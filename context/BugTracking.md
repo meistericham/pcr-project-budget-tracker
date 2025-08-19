@@ -1,5 +1,37 @@
 # Bug / Issue Log
 
+## Enhancement: Step A — Load settings from Supabase in server mode (2024-12-19)
+- **Title**: Added a read path to fetch app settings from app_settings singleton row
+- **Summary**: Implemented Step A of settings persistence enhancement - loading settings from Supabase in server mode
+- **Problem Summary**: 
+  - Server mode settings were only loaded from localStorage fallback
+  - No direct Supabase integration for settings loading
+  - Missing debug logs for server mode settings loading
+
+- **Root Cause**: 
+  - AppContext was not properly integrated with the new getSettings() method
+  - Debug logs were not specific enough for server mode settings loading
+
+- **Changes Made**:
+  - File: `src/lib/settingsService.ts`
+    - Renamed get() method to getSettings() for consistency
+    - Maintains existing error handling and fallback logic
+  - File: `src/contexts/AppContext.tsx`
+    - Updated to use SettingsService.getSettings() method
+    - Enhanced debug logging for server mode settings loading
+    - Added specific log: "[AppContext] (server) applying merged settings keys: ..."
+
+- **Verification Steps**:
+  1. Ensure VITE_USE_SERVER_DB=true
+  2. Reload the app; check console for:
+     - "[AppContext] (server) fetched settings from Supabase: true"
+     - "[AppContext] (server) applying merged settings keys: ..."
+  3. UI should reflect merged defaults (initially identical to defaults as data is {})
+- **Next**: Step B will implement writes (upsert) with role guards
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (pending)
+
 ## Enhancement: Settings persistence in server mode + role guards (2024-12-19)
 - **Title**: Implemented Supabase persistence for settings in server mode with role-based restrictions
 - **Problem Summary**: 

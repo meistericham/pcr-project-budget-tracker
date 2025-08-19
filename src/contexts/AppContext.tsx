@@ -520,14 +520,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         console.log('[AppContext] (server) attempting to fetch settings from Supabase');
-        const remoteSettings = await SettingsService.get();
+        const remoteSettings = await SettingsService.getSettings();
         
         if (remoteSettings) {
           // Merge remote settings with defaults (remote takes precedence)
           const mergedSettings = { ...defaultSettings, ...remoteSettings };
           setSettings(mergedSettings);
           console.log('[AppContext] (server) fetched settings from Supabase: true');
-          console.log('[AppContext] (server) merged remote settings with defaults');
+          console.log('[AppContext] (server) applying merged settings keys:', Object.keys(mergedSettings));
         } else {
           // No remote settings found, check localStorage fallback
           const localSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
