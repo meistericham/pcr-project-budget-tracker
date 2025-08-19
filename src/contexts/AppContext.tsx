@@ -1350,42 +1350,47 @@ const renameUnit = async (id: string, newName: string) => {
 
   // ----- Settings -----
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
-    console.log('[AppContext] updateSettings called with:', newSettings);
-    console.log('[AppContext] useServerDb:', useServerDb);
-    
-    // Get current user and role for role checking
-    const { user, role } = useAuth();
-    
-    // Build a guarded merge
-    const next = { ...settings, ...newSettings };
+    try {
+      console.log('[AppContext] updateSettings called with:', newSettings);
+      console.log('[AppContext] useServerDb:', useServerDb);
 
-    if (useServerDb) {
-      const userRole = role || 'user'; // Get role from AuthContext
-      const restrictedKeys = ['companyName', 'currency']; // extend later if needed
-      
-      if (userRole !== 'super_admin') {
-        // strip restricted changes coming from UI
-        for (const k of restrictedKeys) {
-          if (k in newSettings) delete (next as any)[k];
+      // Merge in memory first
+      const next = { ...settings, ...newSettings };
+
+      // Determine role WITHOUT calling any hook here
+      const userRole = profile?.role ?? 'user';
+      const isSuperAdmin = userRole === 'super_admin';
+
+      // For non-super-admins, block restricted keys (companyName, currency)
+      const restrictedKeys: (keyof AppSettings)[] = ['companyName', 'currency'];
+      const filtered = isSuperAdmin
+        ? next
+        : { ...settings, ...Object.fromEntries(
+            Object.entries(newSettings).filter(([k]) => !restrictedKeys.includes(k as keyof AppSettings))
+          )};
+
+      if (useServerDb) {
+        // Server mode: persist to Supabase
+        const allowedKeys = Object.keys(filtered);
+        console.log('[AppContext] (server) upserting settings with keys:', allowedKeys);
+
+        try {
+          const saved = await upsertSettings(filtered); // from src/lib/settingsService.ts
+          // Merge once more to be safe in case server returns a partial
+          const merged = { ...defaultSettings, ...saved };
+          setSettings(merged);
+          console.log('[AppContext] (server) settings upserted OK');
+        } catch (err) {
+          console.error('[AppContext] (server) settings upsert failed, keeping state only:', err);
+          setSettings(filtered);
         }
+      } else {
+        // Local mode: just set state; autosave effect will persist to localStorage
+        setSettings(filtered);
       }
-      
-      console.log('[AppContext] (server) upserting settings with keys:', Object.keys(next));
-
-      try {
-        await upsertSettings(next, user?.id);
-        setSettings(next); // reflect immediately
-        console.log('[AppContext] (server) settings upserted OK');
-      } catch (e) {
-        console.error('[AppContext] (server) settings upsert failed, keeping state only:', e);
-        // still update state so UI reflects change, but it won't persist server-side
-        setSettings(next);
-      }
-      return;
+    } catch (err) {
+      console.error('[AppContext] updateSettings fatal error:', err);
     }
-
-    // local mode behavior unchanged
-    setSettings(next);
   };
 
   return (

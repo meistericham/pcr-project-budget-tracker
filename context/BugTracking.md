@@ -40,6 +40,8 @@
 - **Date**: 2024-12-19
 - **Commit Hash**: (pending)
 
+**Note**: Fixed invalid hook call (#321) by removing hook usage from non-hook code (updateSettings/services). Hardened server settings upsert and role guards.
+
 ## Enhancement: Step A — Load settings from Supabase in server mode (2024-12-19)
 - **Title**: Added a read path to fetch app settings from app_settings singleton row
 - **Summary**: Implemented Step A of settings persistence enhancement - loading settings from Supabase in server mode
