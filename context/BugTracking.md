@@ -1,5 +1,41 @@
 # Bug / Issue Log
 
+## 🚨 CRITICAL: React Error #321 - Hooks Rules Violation (2024-12-19)
+- **Title**: Runtime error caused by calling useIsSuperAdmin() hook inside regular function
+- **Symptoms**: 
+  - React error #321: "Minified React error #321"
+  - Error occurs in production build
+  - Stack trace: authz.ts:11 → AppContext.tsx:1300 → SettingsView.tsx:85
+  - Application fails to function properly
+
+- **Root Cause**: 
+  - `updateSettings` function in AppContext.tsx was calling `useIsSuperAdmin()` hook
+  - This violates React Rules of Hooks (hooks can only be called in components/hooks)
+  - The function is called from SettingsView component, not defined as a hook
+
+- **Files Changed**:
+  - `src/contexts/AppContext.tsx` - Removed hook call from updateSettings function
+  - `src/components/SettingsView.tsx` - Added role-based restrictions back to UI level
+
+- **The Exact Fix**:
+  - Moved role-based restrictions from AppContext.updateSettings back to SettingsView
+  - AppContext.updateSettings now only handles settings updates without role checking
+  - SettingsView.handleInputChange blocks restricted field changes for non-super-admin users
+  - SettingsView.handleSave filters out restricted settings before calling updateSettings
+  - Maintains same functionality but follows React Rules of Hooks correctly
+
+- **How to Verify**:
+  1. Run production build: `npm run build`
+  2. Start dev server: `npm run dev`
+  3. Navigate to Settings page
+  4. Verify no React errors in console
+  5. Test role-based restrictions still work (non-super-admin can't edit restricted fields)
+  6. Verify theme changes still work for all users
+
+- **Follow-ups/TODOs**:
+  - Consider implementing a custom hook for role-based settings validation if needed
+  - Monitor for any other potential hook violations in the codebase
+
 ## Enhancement: Role-based Settings & Persistence ✅ COMPLETED
 - **Summary**: Implemented role-based settings access and persistence
   - Super Admin: can view & edit ALL settings

@@ -1296,51 +1296,19 @@ const renameUnit = async (id: string, newName: string) => {
     console.log('[AppContext] updateSettings called with:', newSettings);
     console.log('[AppContext] useServerDb:', useServerDb);
     
-    // Role-based restrictions - prevent overwriting restricted fields unless super_admin
-    const { allowed: isSuperAdmin } = useIsSuperAdmin();
+    // Note: Role-based restrictions are handled at the UI level in SettingsView
+    // This function allows all settings to be updated, but the UI controls what's editable
     
-    // Filter out restricted settings for non-super-admin users
-    let filteredSettings = newSettings;
-    if (!isSuperAdmin) {
-      // Only allow theme changes for non-super-admin users
-      filteredSettings = {
-        ...newSettings,
-        // Block all restricted settings
-        companyName: undefined,
-        currency: undefined,
-        dateFormat: undefined,
-        budgetAlertThreshold: undefined,
-        autoBackup: undefined,
-        emailNotifications: undefined,
-        defaultProjectStatus: undefined,
-        defaultProjectPriority: undefined,
-        maxProjectDuration: undefined,
-        requireBudgetApproval: undefined,
-        allowNegativeBudget: undefined,
-        budgetCategories: undefined,
-        fiscalYearStart: undefined,
-        // Keep theme if it's being updated
-        ...(newSettings.theme !== undefined ? { theme: newSettings.theme } : {})
-      };
-      
-      // Remove undefined values
-      filteredSettings = Object.fromEntries(
-        Object.entries(filteredSettings).filter(([_, value]) => value !== undefined)
-      ) as Partial<AppSettings>;
-      
-      console.log('[AppContext] Role-based filtering applied. Filtered settings:', filteredSettings);
-    }
-    
-    console.log('[AppContext] Settings being applied:', Object.keys(filteredSettings));
+    console.log('[AppContext] Settings being applied:', Object.keys(newSettings));
     
     // Update state by merging with existing settings
-    setSettings(prev => ({ ...prev, ...filteredSettings }));
+    setSettings(prev => ({ ...prev, ...newSettings }));
     
     // Persist based on mode
     if (!useServerDb) {
       // Local mode: save to localStorage
       console.log('[AppContext] Local mode - persisting to localStorage');
-      const currentSettings = { ...settings, ...filteredSettings };
+      const currentSettings = { ...settings, ...newSettings };
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(currentSettings));
       console.log('[AppContext] Settings persisted to localStorage successfully');
     } else {

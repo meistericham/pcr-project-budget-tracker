@@ -69,17 +69,34 @@ const SettingsView = () => {
   });
 
   const handleInputChange = (field: string, value: any) => {
-    // Note: Role-based restrictions are now handled in AppContext.updateSettings
-    // This function allows all input changes for UI responsiveness
+    // Role-based restrictions for settings
+    if (!isSA && (field === 'companyName' || field === 'currency' || field === 'dateFormat' || 
+                   field === 'budgetAlertThreshold' || field === 'autoBackup' || field === 'emailNotifications' ||
+                   field === 'defaultProjectStatus' || field === 'defaultProjectPriority' || field === 'maxProjectDuration' ||
+                   field === 'requireBudgetApproval' || field === 'allowNegativeBudget' || field === 'budgetCategories' ||
+                   field === 'fiscalYearStart' || field === 'companyLogo')) {
+      console.log('[SettingsView] Blocked setting change for non-super-admin user:', field, value);
+      return; // Block the change
+    }
+    
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleSave = () => {
-    const updatedSettings = {
+    let updatedSettings = {
       ...formData,
       budgetCategories: formData.budgetCategories.split(',').map(cat => cat.trim()).filter(Boolean)
     };
+    
+    // Filter out restricted settings for non-super-admin users
+    if (!isSA) {
+      const allowedFields = ['theme']; // Only theme is allowed for non-super-admin users
+      updatedSettings = Object.fromEntries(
+        Object.entries(updatedSettings).filter(([key]) => allowedFields.includes(key))
+      ) as any;
+      console.log('[SettingsView] Filtered settings for non-super-admin user:', updatedSettings);
+    }
     
     console.log('[SettingsView] Saving settings:', updatedSettings);
     updateSettings(updatedSettings);
