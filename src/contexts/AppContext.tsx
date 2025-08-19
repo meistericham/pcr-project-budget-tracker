@@ -156,7 +156,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Feature flag: server mode
   const useServerDb = import.meta.env.VITE_USE_SERVER_DB === 'true';
-
+  console.log('[DEBUG] useServerDb =', useServerDb);
+  
   // Debounced savers
   const debouncedSaveUsers = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.USERS), []);
   const debouncedSaveProjects = React.useMemo(() => createDebouncedSave(STORAGE_KEYS.PROJECTS), []);
@@ -495,9 +496,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, defaultNotifications),
   );
 
-  // Initialize default settings only if none exist
+ // Initialize default settings only if none exist
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
+    const existing = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    console.log('[DEBUG] init-defaults effect: existing pcr_settings =', existing);
+    if (!existing) {
+      console.log('[DEBUG] init-defaults effect: writing defaultSettings → pcr_settings');
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(defaultSettings));
     }
   }, []);
@@ -618,7 +622,10 @@ useEffect(() => {
   }, [notifications, debouncedSaveNotifications, useServerDb]);
   useEffect(() => {
     if (!useServerDb) {
+      console.log('[DEBUG] autosave effect: saving settings →', settings);
       debouncedSaveSettings(settings);
+    } else {
+      console.log('[DEBUG] autosave effect: skipped because useServerDb=true');
     }
   }, [settings, debouncedSaveSettings, useServerDb]);
 
