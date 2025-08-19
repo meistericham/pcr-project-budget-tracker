@@ -468,9 +468,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ];
 
   // State (server mode starts empty)
-  const [settings, setSettings] = useState<AppSettings>(() =>
-    loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings),
-  );
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const s = loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings);
+    console.log('[DEBUG] Initial settings from storage:', s);
+    return s;
+  });
   const [users, setUsers] = useState<User[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.USERS, defaultUsers),
   );
