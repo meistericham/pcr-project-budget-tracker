@@ -64,19 +64,45 @@ const SettingsView = () => {
     maxProjectDuration: settings.maxProjectDuration,
     requireBudgetApproval: settings.requireBudgetApproval,
     allowNegativeBudget: settings.allowNegativeBudget,
-    budgetCategories: settings.budgetCategories.join(', ')
+    budgetCategories: settings.budgetCategories.join(', '),
+    theme: settings.theme
   });
 
   const handleInputChange = (field: string, value: any) => {
+    // Role-based restrictions for settings
+    if (!isSA && (field === 'companyName' || field === 'currency' || field === 'dateFormat' || 
+                   field === 'budgetAlertThreshold' || field === 'autoBackup' || field === 'emailNotifications' ||
+                   field === 'defaultProjectStatus' || field === 'defaultProjectPriority' || field === 'maxProjectDuration' ||
+                   field === 'requireBudgetApproval' || field === 'allowNegativeBudget' || field === 'budgetCategories' ||
+                   field === 'fiscalYearStart' || field === 'companyLogo')) {
+      console.log('[SettingsView] Blocked setting change for non-super-admin user:', field, value);
+      return; // Block the change
+    }
+    
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleSave = () => {
-    const updatedSettings = {
+    let updatedSettings = {
       ...formData,
       budgetCategories: formData.budgetCategories.split(',').map(cat => cat.trim()).filter(Boolean)
     };
+    
+    // Filter out restricted settings for non-super-admin users
+    if (!isSA) {
+      const allowedFields = ['theme']; // Only theme is allowed for non-super-admin users
+      updatedSettings = Object.fromEntries(
+        Object.entries(updatedSettings).filter(([key]) => allowedFields.includes(key))
+      ) as any;
+      console.log('[SettingsView] Filtered settings for non-super-admin user:', updatedSettings);
+    }
+    
+    // Always include theme in settings update
+    if (formData.theme) {
+      updatedSettings.theme = formData.theme;
+    }
+    
     updateSettings(updatedSettings);
     setHasChanges(false);
   };
@@ -211,7 +237,12 @@ const SettingsView = () => {
           </label>
           <select
             value={theme}
-            onChange={(e) => setTheme(e.target.value as any)}
+            onChange={(e) => {
+              const newTheme = e.target.value as any;
+              setTheme(newTheme);
+              setFormData(prev => ({ ...prev, theme: newTheme }));
+              setHasChanges(true);
+            }}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             {themes.map(themeOption => (

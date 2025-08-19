@@ -11,11 +11,13 @@
 
 - **Code Changes**:
   - File: `src/contexts/AppContext.tsx`
-    - Enhanced `updateSettings` function with role-based restrictions
-    - Improved debug logging for settings persistence and role checks
+    - Fixed critical bug: removed useIsSuperAdmin() hook call from updateSettings function
+    - Improved debug logging for settings persistence
     - Settings initialization only writes defaults when no settings exist
     - Autosave runs only in local mode, manual save persists immediately
   - File: `src/components/SettingsView.tsx`
+    - Added role-based restrictions in handleInputChange function
+    - Added role-based filtering in handleSave function
     - Role-based tab visibility (General, Security for all; admin-only tabs for super_admin)
     - Company Name and Currency inputs disabled for non-super-admin users
     - Helper text: "Only Super Admins can modify this."
@@ -27,10 +29,13 @@
 
 - **Bugs Found and Fixed**:
   - ✅ Settings persistence already working correctly (no defaults overwrite user changes)
-  - ✅ Role-based restrictions already implemented in updateSettings
   - ✅ Tab visibility already role-based
   - ✅ Theme persistence already implemented
   - ✅ Role sourcing from Supabase session already working
+  - 🚨 **CRITICAL BUG FIXED**: White page caused by calling useIsSuperAdmin() hook inside updateSettings function
+    - **Root Cause**: React hooks can only be called at top level of components/hooks, not inside regular functions
+    - **Fix**: Moved role-based restrictions to UI level in SettingsView.handleInputChange and handleSave
+    - **Impact**: Application was completely broken (white page) due to React Rules of Hooks violation
 
 - **Verification Steps**:
   - ✅ As super_admin: change Budget Alert Threshold → refresh → persists
