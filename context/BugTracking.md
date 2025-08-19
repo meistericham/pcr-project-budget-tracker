@@ -1,5 +1,57 @@
 # Bug / Issue Log
 
+## Enhancement: Settings persistence in server mode + role guards (2024-12-19)
+- **Title**: Implemented Supabase persistence for settings in server mode with role-based restrictions
+- **Problem Summary**: 
+  - Server mode settings were only updated in state (not persisted)
+  - Logs showed: "Server mode - settings updated in state only"
+  - Autosave was skipped when useServerDb=true
+  - Settings lost on page refresh in server mode
+  - Role-based restrictions were incomplete
+
+- **Root Cause**: 
+  - Server mode had no persistence path implemented
+  - AppContext.updateSettings only handled localStorage for local mode
+  - Role-based restrictions were scattered between UI and context layers
+  - No fallback mechanism when Supabase table is missing
+
+- **Changes Made**:
+  - File: `src/lib/settingsService.ts` (NEW)
+    - Created SettingsService class with get() and upsert() methods
+    - Handles Supabase table 'app_settings' with singleton pattern
+    - Graceful fallback when table missing
+    - Proper error handling and logging
+  - File: `src/contexts/AppContext.tsx`
+    - Added server mode settings initialization from Supabase
+    - Implemented role-based restrictions in updateSettings function
+    - Added Supabase persistence with localStorage fallback
+    - Enhanced debug logging for server vs local mode
+  - File: `src/components/SettingsView.tsx`
+    - Simplified handleInputChange and handleSave functions
+    - Role-based restrictions now handled centrally in AppContext
+    - Added async handling for updateSettings calls
+
+- **Verification Steps**:
+  1. **Super Admin**: change Budget Alert Threshold → save → refresh → value persists
+  2. **Admin/User**: attempt change Company Name/Currency → does not persist; Theme change persists after refresh
+  3. **Toggle VITE_USE_SERVER_DB**: true/false and verify both paths work
+  4. **Check logs**: should show server mode persistence attempts and fallbacks
+  5. **Database table**: if missing, settings fall back to localStorage gracefully
+
+- **Database Setup** (if table missing):
+  ```sql
+  create table if not exists app_settings (
+    id text primary key,
+    data jsonb not null default '{}'::jsonb,
+    updated_by text,
+    updated_at timestamptz not null default now()
+  );
+  -- Optional RLS off for now (or add policies if needed)
+  ```
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (to be filled after commit)
+
 ## 🚨 CRITICAL: React Error #321 - Hooks Rules Violation (2024-12-19)
 - **Title**: Runtime error caused by calling useIsSuperAdmin() hook inside regular function
 - **Symptoms**: 

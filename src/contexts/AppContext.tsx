@@ -14,6 +14,7 @@ import {
   dbUpdateUnit,
   dbUpdateDivision,
 } from '../lib/database';
+import { SettingsService } from '../lib/settingsService';
 import { useAuth } from './AuthContext';
 import { useIsSuperAdmin } from '../lib/authz';
 import {
@@ -79,7 +80,7 @@ interface AppContextType {
   toggleBudgetCodeStatus: (id: string) => Promise<void>;
 
   // Settings
-  updateSettings: (settings: Partial<AppSettings>) => void;
+  updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
 
   // Notifications
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
@@ -511,6 +512,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('[AppContext] Settings already exist, skipping default initialization');
     }
   }, []);
+
+  // Load settings from server mode if enabled
+  useEffect(() => {
+    if (!useServerDb) return;
+    
+    (async () => {
+      try {
+        console.log('[AppContext] (server) attempting to fetch settings from Supabase');
+        const remoteSettings = await SettingsService.get();
+        
+        if (remoteSettings) {
+          // Merge remote settings with defaults (remote takes precedence)
+          const mergedSettings = { ...defaultSettings, ...remoteSettings };
+          setSettings(mergedSettings);
+          console.log('[AppContext] (server) fetched settings from Supabase: true');
+          console.log('[AppContext] (server) merged remote settings with defaults');
+        } else {
+          // No remote settings found, check localStorage fallback
+          const localSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+          if (localSettings) {
+            try {
+              const parsed = JSON.parse(localSettings);
+              const mergedSettings = { ...defaultSettings, ...parsed };
+              setSettings(mergedSettings);
+              console.log('[AppContext] (server) falling back to localStorage: true');
+              console.log('[AppContext] (server) merged local settings with defaults');
+            } catch (e) {
+              console.warn('[AppContext] (server) localStorage parse failed, using defaults');
+              setSettings(defaultSettings);
+            }
+          } else {
+            console.log('[AppContext] (server) no settings found, using defaults');
+            setSettings(defaultSettings);
+          }
+        }
+      } catch (error) {
+        console.error('[AppContext] (server) settings fetch failed:', error);
+        // Fallback to localStorage
+        const localSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+        if (localSettings) {
+          try {
+            const parsed = JSON.parse(localSettings);
+            const mergedSettings = { ...defaultSettings, ...parsed };
+            setSettings(mergedSettings);
+            console.log('[AppContext] (server) falling back to localStorage: true (after error)');
+          } catch (e) {
+            console.warn('[AppContext] (server) localStorage parse failed after error, using defaults');
+            setSettings(defaultSettings);
+          }
+        } else {
+          console.log('[AppContext] (server) using defaults after error');
+          setSettings(defaultSettings);
+        }
+      }
+    })();
+  }, [useServerDb]);
 
   // Load divisions (server)
   useEffect(() => {
@@ -1292,32 +1349,67 @@ const renameUnit = async (id: string, newName: string) => {
   };
 
   // ----- Settings -----
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
+  const updateSettings = async (newSettings: Partial<AppSettings>) => {
     console.log('[AppContext] updateSettings called with:', newSettings);
     console.log('[AppContext] useServerDb:', useServerDb);
     
-    // Note: Role-based restrictions are handled at the UI level in SettingsView
-    // This function allows all settings to be updated, but the UI controls what's editable
+    // Get current user for role checking
+    const { user } = useAuth();
+    const { allowed: isSuperAdmin } = useIsSuperAdmin();
     
-    console.log('[AppContext] Settings being applied:', Object.keys(newSettings));
+    // Enforce role-based restrictions
+    let sanitizedSettings = newSettings;
+    if (!isSuperAdmin) {
+      // Non-super-admin users can only change theme
+      const restrictedFields = ['companyName', 'currency', 'dateFormat', 'budgetAlertThreshold', 
+                               'autoBackup', 'emailNotifications', 'defaultProjectStatus', 
+                               'defaultProjectPriority', 'maxProjectDuration', 'requireBudgetApproval', 
+                               'allowNegativeBudget', 'budgetCategories', 'fiscalYearStart', 'companyLogo'];
+      
+      const strippedKeys = Object.keys(newSettings).filter(key => 
+        restrictedFields.includes(key) && newSettings[key as keyof AppSettings] !== undefined
+      );
+      
+      if (strippedKeys.length > 0) {
+        console.log('[AppContext] Role-based filtering: stripped keys for non-super-admin:', strippedKeys);
+        sanitizedSettings = Object.fromEntries(
+          Object.entries(newSettings).filter(([key]) => !restrictedFields.includes(key))
+        ) as Partial<AppSettings>;
+      }
+    }
     
-    // Update state by merging with existing settings
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    console.log('[AppContext] Settings being applied:', Object.keys(sanitizedSettings));
+    
+    // Compute next settings state
+    const nextSettings = { ...settings, ...sanitizedSettings };
+    
+    // Update state immediately for UI responsiveness
+    setSettings(nextSettings);
     
     // Persist based on mode
     if (!useServerDb) {
       // Local mode: save to localStorage
       console.log('[AppContext] Local mode - persisting to localStorage');
-      const currentSettings = { ...settings, ...newSettings };
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(currentSettings));
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
       console.log('[AppContext] Settings persisted to localStorage successfully');
     } else {
-      // Server mode: TODO - implement Supabase persistence
-      console.log('[AppContext] Server mode - settings updated in state only');
-      console.log('[AppContext] TODO: Implement Supabase persistence for settings');
-      
-      // For now, we could implement a simple Supabase update here
-      // This would require a settings table in the database
+      // Server mode: try Supabase persistence
+      try {
+        console.log('[AppContext] Server mode - attempting Supabase upsert');
+        await SettingsService.upsert(nextSettings, user?.id);
+        console.log('[AppContext] Server mode - Supabase upsert successful');
+        
+        // Also write to localStorage as a bridge/backup
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
+        console.log('[AppContext] Server mode - also wrote to localStorage as backup');
+      } catch (error) {
+        console.error('[AppContext] Server mode - Supabase upsert failed:', error);
+        console.log('[AppContext] Server mode - falling back to localStorage');
+        
+        // Fallback to localStorage
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
+        console.log('[AppContext] Server mode - fallback to localStorage successful');
+      }
     }
   };
 
