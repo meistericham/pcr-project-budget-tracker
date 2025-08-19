@@ -143,7 +143,7 @@ const SettingsView = () => {
             />
             {!isSuperAdmin && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Only Super Admins can modify company information
+                Only Super Admins can modify this.
               </p>
             )}
           </div>
@@ -194,7 +194,7 @@ const SettingsView = () => {
         </div>
         {!isSuperAdmin && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Only Super Admins can modify regional settings
+            Only Super Admins can modify this.
           </p>
         )}
       </div>

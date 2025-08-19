@@ -15,6 +15,7 @@ import {
   dbUpdateDivision,
 } from '../lib/database';
 import { useAuth } from './AuthContext';
+import { useIsSuperAdmin } from '../lib/authz';
 import {
   User,
   Project,
@@ -204,6 +205,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     maxProjectDuration: 365,
     requireBudgetApproval: false,
     allowNegativeBudget: false,
+    theme: 'system',
   };
 
   // Default seed data
@@ -471,7 +473,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // State (server mode starts empty)
   const [settings, setSettings] = useState<AppSettings>(() => {
     const s = loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings);
-    console.log('[DEBUG] Initial settings from storage:', s);
+    console.log('[AppContext] Initial settings loaded from storage:', s);
+    console.log('[AppContext] useServerDb:', useServerDb);
     return s;
   });
   const [users, setUsers] = useState<User[]>(() =>
@@ -499,10 +502,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
  // Initialize default settings only if none exist
   useEffect(() => {
     const existing = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    console.log('[DEBUG] init-defaults effect: existing pcr_settings =', existing);
+    console.log('[AppContext] init-defaults effect: existing pcr_settings =', existing);
     if (!existing) {
-      console.log('[DEBUG] init-defaults effect: writing defaultSettings → pcr_settings');
+      console.log('[AppContext] init-defaults effect: writing defaultSettings → pcr_settings');
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(defaultSettings));
+      console.log('[AppContext] Default settings initialized successfully');
+    } else {
+      console.log('[AppContext] Settings already exist, skipping default initialization');
     }
   }, []);
 
@@ -1287,7 +1293,57 @@ const renameUnit = async (id: string, newName: string) => {
 
   // ----- Settings -----
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    console.log('[AppContext] updateSettings called with:', newSettings);
+    console.log('[AppContext] useServerDb:', useServerDb);
+    
+    // Role-based restrictions
+    const { allowed: isSuperAdmin } = useIsSuperAdmin();
+    
+    // Filter out restricted settings for non-super-admin users
+    const filteredSettings = isSuperAdmin ? newSettings : {
+      ...newSettings,
+      // Only allow theme changes for non-super-admin users
+      ...(newSettings.theme !== undefined ? { theme: newSettings.theme } : {}),
+      // Block all other settings for non-super-admin users
+      ...(isSuperAdmin ? {} : {
+        currency: undefined,
+        companyName: undefined,
+        budgetAlertThreshold: undefined,
+        autoBackup: undefined,
+        emailNotifications: undefined,
+        defaultProjectStatus: undefined,
+        defaultProjectPriority: undefined,
+        maxProjectDuration: undefined,
+        requireBudgetApproval: undefined,
+        allowNegativeBudget: undefined,
+        budgetCategories: undefined,
+        dateFormat: undefined,
+        fiscalYearStart: undefined,
+        companyLogo: undefined,
+      })
+    };
+    
+    // Remove undefined values
+    const cleanSettings = Object.fromEntries(
+      Object.entries(filteredSettings).filter(([_, value]) => value !== undefined)
+    );
+    
+    console.log('[AppContext] Filtered settings:', cleanSettings);
+    console.log('[AppContext] User role - isSuperAdmin:', isSuperAdmin);
+    console.log('[AppContext] Settings being applied:', Object.keys(cleanSettings));
+    
+    // Update state
+    setSettings(prev => ({ ...prev, ...cleanSettings }));
+    
+    // Persist immediately if not in server mode
+    if (!useServerDb) {
+      console.log('[AppContext] Persisting settings to localStorage immediately');
+      const currentSettings = { ...settings, ...cleanSettings };
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(currentSettings));
+      console.log('[AppContext] Settings persisted successfully');
+    } else {
+      console.log('[AppContext] Server mode - settings not persisted to localStorage');
+    }
   };
 
   return (

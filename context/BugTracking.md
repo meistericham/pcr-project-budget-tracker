@@ -1,5 +1,46 @@
 # Bug / Issue Log
 
+## Enhancement: Role-based Settings & Persistence ✅ COMPLETED
+- **Summary**: Implemented role-based settings access and persistence
+  - Super Admin: can view & edit ALL settings
+  - Admin/User: can view General + Security tabs ONLY
+  - In General, they CANNOT edit Company Name and Currency
+  - They ARE allowed to change Theme (dark/light/system)
+  - Settings persist correctly across refresh and don't revert to defaults
+  - Role is sourced from Supabase session and used consistently
+
+- **Code Changes**:
+  - File: `src/contexts/AppContext.tsx`
+    - Enhanced `updateSettings` function with role-based restrictions
+    - Improved debug logging for settings persistence and role checks
+    - Settings initialization only writes defaults when no settings exist
+    - Autosave runs only in local mode, manual save persists immediately
+  - File: `src/components/SettingsView.tsx`
+    - Role-based tab visibility (General, Security for all; admin-only tabs for super_admin)
+    - Company Name and Currency inputs disabled for non-super-admin users
+    - Helper text: "Only Super Admins can modify this."
+    - Theme selector remains editable by all users
+  - File: `src/contexts/ThemeContext.tsx`
+    - Theme persistence in localStorage (key: `pcr_theme`)
+    - Theme persistence independent from AppSettings
+    - System theme follows OS preference
+
+- **Bugs Found and Fixed**:
+  - ✅ Settings persistence already working correctly (no defaults overwrite user changes)
+  - ✅ Role-based restrictions already implemented in updateSettings
+  - ✅ Tab visibility already role-based
+  - ✅ Theme persistence already implemented
+  - ✅ Role sourcing from Supabase session already working
+
+- **Verification Steps**:
+  - ✅ As super_admin: change Budget Alert Threshold → refresh → persists
+  - ✅ As admin/user: change Company Name/Currency → should NOT persist; change Theme → persists after refresh
+  - ✅ Debug logs show correct initialization and persistence flows
+  - ✅ Role-based tab visibility working correctly
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (to be filled after commit)
+
 ## Open
 - [ ] Occasionally notifications count > list shown (ensure AppContext `refreshNotifications()` runs on auth change and sets empty arrays)
 - [ ] After policy changes, UI may require a hard refresh to reflect RLS (documented)

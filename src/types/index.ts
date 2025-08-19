@@ -98,6 +98,7 @@ export interface AppSettings {
   maxProjectDuration: number; // Days
   requireBudgetApproval: boolean;
   allowNegativeBudget: boolean;
+  theme: 'light' | 'dark' | 'system';
 }
 
 export type ViewMode = 'projects' | 'budget' | 'users' | 'budget-codes' | 'settings' | 'admin-users';
