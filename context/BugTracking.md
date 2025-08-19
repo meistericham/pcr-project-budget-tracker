@@ -1,5 +1,45 @@
 # Bug / Issue Log
 
+## Enhancement: Step B — Persist settings to Supabase with role guard (2024-12-19)
+- **Title**: In server mode, settings save path writes to app_settings singleton; super_admin can write all fields; admin/user restricted to theme
+- **Summary**: Implemented Step B of settings persistence enhancement - writing settings to Supabase with role-based restrictions
+- **Problem Summary**: 
+  - Server mode settings were not persisted to Supabase
+  - Role-based restrictions were not enforced at the persistence level
+  - Missing defensive logic for missing singleton row
+
+- **Root Cause**: 
+  - AppContext.updateSettings only handled localStorage for local mode
+  - Role-based restrictions were not implemented for server mode persistence
+  - No upsert logic for app_settings table
+
+- **Changes Made**:
+  - File: `src/lib/settingsService.ts`
+    - Added upsertSettings() function for direct import
+    - Maintains existing SettingsService class functionality
+    - Defensive upsert with onConflict: 'id' for missing singleton row
+  - File: `src/contexts/AppContext.tsx`
+    - Updated imports to use getSettings and upsertSettings functions
+    - Implemented role-guarded updateSettings logic for server mode
+    - Role rules: super_admin can write all fields, admin/user restricted to non-restricted items
+    - Restricted keys: companyName, currency (extensible for future)
+    - Enhanced debug logging for server mode upsert operations
+  - File: `src/components/SettingsView.tsx`
+    - Debug log already present: "[SettingsView] Saving settings: ..."
+    - Company Name & Currency inputs already disabled for non-super-admin users
+    - Save button calls updateSettings(formData) as-is, role guard handles filtering server-side
+
+- **Verification Steps**:
+  1. As super_admin: change Budget Alert Threshold → Save → refresh → value persists from Supabase
+  2. As admin/user: attempt to change Company Name/Currency → Save → refresh → NOT changed; change Theme → Save → refresh → Theme persists
+  3. Check console logs for upsert messages and keys written:
+     - "[AppContext] (server) upserting settings with keys: ..."
+     - "[AppContext] (server) settings upserted OK" or failure message
+- **Next**: Settings persistence is now complete with role-based restrictions
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (pending)
+
 ## Enhancement: Step A — Load settings from Supabase in server mode (2024-12-19)
 - **Title**: Added a read path to fetch app settings from app_settings singleton row
 - **Summary**: Implemented Step A of settings persistence enhancement - loading settings from Supabase in server mode

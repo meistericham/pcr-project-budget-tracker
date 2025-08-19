@@ -108,3 +108,17 @@ export class SettingsService {
     }
   }
 }
+
+// Plain module functions for direct import
+export async function getSettings(): Promise<AppSettings | null> {
+  return SettingsService.getSettings();
+}
+
+export async function upsertSettings(data: any, actorUserId?: string): Promise<void> {
+  const payload = { id: 'singleton', data, updated_by: actorUserId ?? null };
+  const { error } = await supabase.from('app_settings').upsert(payload, { onConflict: 'id' });
+  if (error) {
+    console.error('[SettingsService] upsertSettings failed:', error);
+    throw error;
+  }
+}

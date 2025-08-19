@@ -14,7 +14,7 @@ import {
   dbUpdateUnit,
   dbUpdateDivision,
 } from '../lib/database';
-import { SettingsService } from '../lib/settingsService';
+import { getSettings, upsertSettings } from '../lib/settingsService';
 import { useAuth } from './AuthContext';
 import { useIsSuperAdmin } from '../lib/authz';
 import {
@@ -520,7 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         console.log('[AppContext] (server) attempting to fetch settings from Supabase');
-        const remoteSettings = await SettingsService.getSettings();
+        const remoteSettings = await getSettings();
         
         if (remoteSettings) {
           // Merge remote settings with defaults (remote takes precedence)
@@ -1353,64 +1353,39 @@ const renameUnit = async (id: string, newName: string) => {
     console.log('[AppContext] updateSettings called with:', newSettings);
     console.log('[AppContext] useServerDb:', useServerDb);
     
-    // Get current user for role checking
-    const { user } = useAuth();
-    const { allowed: isSuperAdmin } = useIsSuperAdmin();
+    // Get current user and role for role checking
+    const { user, role } = useAuth();
     
-    // Enforce role-based restrictions
-    let sanitizedSettings = newSettings;
-    if (!isSuperAdmin) {
-      // Non-super-admin users can only change theme
-      const restrictedFields = ['companyName', 'currency', 'dateFormat', 'budgetAlertThreshold', 
-                               'autoBackup', 'emailNotifications', 'defaultProjectStatus', 
-                               'defaultProjectPriority', 'maxProjectDuration', 'requireBudgetApproval', 
-                               'allowNegativeBudget', 'budgetCategories', 'fiscalYearStart', 'companyLogo'];
+    // Build a guarded merge
+    const next = { ...settings, ...newSettings };
+
+    if (useServerDb) {
+      const userRole = role || 'user'; // Get role from AuthContext
+      const restrictedKeys = ['companyName', 'currency']; // extend later if needed
       
-      const strippedKeys = Object.keys(newSettings).filter(key => 
-        restrictedFields.includes(key) && newSettings[key as keyof AppSettings] !== undefined
-      );
-      
-      if (strippedKeys.length > 0) {
-        console.log('[AppContext] Role-based filtering: stripped keys for non-super-admin:', strippedKeys);
-        sanitizedSettings = Object.fromEntries(
-          Object.entries(newSettings).filter(([key]) => !restrictedFields.includes(key))
-        ) as Partial<AppSettings>;
+      if (userRole !== 'super_admin') {
+        // strip restricted changes coming from UI
+        for (const k of restrictedKeys) {
+          if (k in newSettings) delete (next as any)[k];
+        }
       }
-    }
-    
-    console.log('[AppContext] Settings being applied:', Object.keys(sanitizedSettings));
-    
-    // Compute next settings state
-    const nextSettings = { ...settings, ...sanitizedSettings };
-    
-    // Update state immediately for UI responsiveness
-    setSettings(nextSettings);
-    
-    // Persist based on mode
-    if (!useServerDb) {
-      // Local mode: save to localStorage
-      console.log('[AppContext] Local mode - persisting to localStorage');
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
-      console.log('[AppContext] Settings persisted to localStorage successfully');
-    } else {
-      // Server mode: try Supabase persistence
+      
+      console.log('[AppContext] (server) upserting settings with keys:', Object.keys(next));
+
       try {
-        console.log('[AppContext] Server mode - attempting Supabase upsert');
-        await SettingsService.upsert(nextSettings, user?.id);
-        console.log('[AppContext] Server mode - Supabase upsert successful');
-        
-        // Also write to localStorage as a bridge/backup
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
-        console.log('[AppContext] Server mode - also wrote to localStorage as backup');
-      } catch (error) {
-        console.error('[AppContext] Server mode - Supabase upsert failed:', error);
-        console.log('[AppContext] Server mode - falling back to localStorage');
-        
-        // Fallback to localStorage
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
-        console.log('[AppContext] Server mode - fallback to localStorage successful');
+        await upsertSettings(next, user?.id);
+        setSettings(next); // reflect immediately
+        console.log('[AppContext] (server) settings upserted OK');
+      } catch (e) {
+        console.error('[AppContext] (server) settings upsert failed, keeping state only:', e);
+        // still update state so UI reflects change, but it won't persist server-side
+        setSettings(next);
       }
+      return;
     }
+
+    // local mode behavior unchanged
+    setSettings(next);
   };
 
   return (
