@@ -123,7 +123,16 @@ const saveToStorage = (key: string, data: any) => {
 const loadFromStorage = (key: string, defaultValue: any) => {
   try {
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
+    if (!stored) return defaultValue;
+    
+    const parsed = JSON.parse(stored);
+    
+    // For settings, merge with defaults to ensure new fields are applied
+    if (key === STORAGE_KEYS.SETTINGS && defaultValue) {
+      return { ...defaultValue, ...parsed };
+    }
+    
+    return parsed;
   } catch (error) {
     console.error('Failed to load from localStorage:', error);
     return defaultValue;
@@ -460,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // State (server mode starts empty)
   const [settings, setSettings] = useState<AppSettings>(() =>
-    useServerDb ? defaultSettings : loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings),
+    loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings),
   );
   const [users, setUsers] = useState<User[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.USERS, defaultUsers),
@@ -483,6 +492,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<Notification[]>(() =>
     useServerDb ? [] : loadFromStorage(STORAGE_KEYS.NOTIFICATIONS, defaultNotifications),
   );
+
+  // Initialize default settings only if none exist
+  useEffect(() => {
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(defaultSettings));
+    }
+  }, []);
 
   // Load divisions (server)
   useEffect(() => {
@@ -599,8 +615,10 @@ useEffect(() => {
     }
   }, [notifications, debouncedSaveNotifications, useServerDb]);
   useEffect(() => {
-    debouncedSaveSettings(settings);
-  }, [settings, debouncedSaveSettings]);
+    if (!useServerDb) {
+      debouncedSaveSettings(settings);
+    }
+  }, [settings, debouncedSaveSettings, useServerDb]);
 
   // ----- Division CRUD -----
   const addDivision = async (

@@ -56,6 +56,20 @@
   - **Fix**: Restructured modal layout with `max-h-[90vh]`, `flex flex-col`, and `overflow-y-auto` on form body
   - **Status**: Fixed (date: 2024-12-19)
 
+## Settings & Persistence Issues
+- [x] **Budget Settings Reset on Refresh**: Budget settings (e.g., Budget Alert Threshold) reverted to default values (80) after page refresh
+  - **Root Cause**: AppContext.tsx always initialized settings with defaultSettings in server mode and overwrote Local Storage with defaults on startup
+  - **Fix Implemented**: 
+    - Always load settings from Local Storage if available, merging with defaults
+    - Prevent overwriting Local Storage with defaults when useServerDb is true
+    - Added guard to only initialize defaults if no settings exist in Local Storage
+    - Improved loadFromStorage to merge saved settings with defaults for new fields
+  - **Verification**: 
+    - Set Budget Alert Threshold to 77 and save
+    - Refresh the page → the UI still shows 77
+    - Confirmed with JSON.parse(localStorage.getItem('pcr_settings')).budgetAlertThreshold === 77
+  - **Status**: Fixed (date: 2024-12-19)
+
 ## Regression Test / How to Verify
 
 ### Edge Function Performance & Reliability
