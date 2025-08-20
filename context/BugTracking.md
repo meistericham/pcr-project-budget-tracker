@@ -1,5 +1,143 @@
 # Bug / Issue Log
 
+## Enhancement: Super Admin Password Management Implementation (2024-12-19)
+- **Title**: Implement Password Management on /admin/users (Super Admin only)
+- **Summary**: 
+  - Upgraded /admin/users into a clean Password Management & User Admin page
+  - Access control: page visible/usable only by Super Admin
+  - Primary action: "Send password reset email" (Supabase emails; user sets new password)
+  - Fallback action: "Force reset now" (admin-reset-password edge function) behind confirm dialog
+  - Modern UI with Tailwind CSS, breadcrumbs, and Back/Home button
+  - Integrated with current AuthContext helpers; no duplicate Supabase clients
+  - Enhanced UpdatePassword page with modern styling and better UX
+
+- **Problem Summary**: 
+  - /admin/users page had basic functionality but poor UI/UX
+  - No clear password reset workflow for Super Admins
+  - UpdatePassword page was unstyled and basic
+  - Missing toast notifications for user feedback
+  - No confirmation dialogs for destructive actions
+
+- **Root Cause**: 
+  - Legacy UI implementation without modern design patterns
+  - Missing toast notification system
+  - Basic styling without Tailwind components
+  - No confirmation dialogs for admin actions
+
+- **Changes Made**:
+  - File: `src/contexts/AuthContext.tsx` — enhanced forgotPassword method
+    - Added optional redirectTo parameter support
+    - Maintains backward compatibility
+    - Updated interface to reflect new signature
+  - File: `src/components/Toast.tsx` (NEW) — toast notification system
+    - Custom toast component with success/error/warning/info types
+    - useToast hook for easy integration
+    - Animated transitions and auto-dismiss
+  - File: `src/components/ConfirmDialog.tsx` (NEW) — confirmation dialog
+    - Reusable confirmation dialog with variants (danger/warning/info)
+    - Consistent styling with the app theme
+  - File: `src/pages/UsersAdmin.tsx` — complete UI rewrite
+    - Modern table design with user avatars and role badges
+    - Breadcrumb navigation: Home / Admin / Users
+    - Primary action: "Send Reset Email" button
+    - Fallback action: "Force Reset (fallback)" with confirm dialog
+    - Toast notifications for all actions
+    - Loading states and proper error handling
+    - Responsive design with proper spacing and typography
+  - File: `src/pages/UpdatePassword.tsx` — enhanced styling and UX
+    - Modern Tailwind CSS styling with dark mode support
+    - Password strength indicator
+    - Password visibility toggles
+    - Better error handling and success states
+    - Responsive design with proper loading states
+
+- **Bugs found & fixed**:
+  - ✅ TypeScript interface mismatch for forgotPassword method (fixed)
+  - ✅ Missing toast notification system (implemented)
+  - ✅ Basic UpdatePassword page styling (enhanced)
+  - ✅ No confirmation dialogs for admin actions (implemented)
+  - ✅ Poor UI/UX on admin users page (completely redesigned)
+
+- **Verification steps**:
+  1. Super Admin visits /admin/users → page loads with modern UI
+  2. Non-Super Admin visits /admin/users → redirected with proper 403 page
+  3. Click "Send Reset Email" → toast shows success, email sent
+  4. Click "Force Reset (fallback)" → confirm dialog appears
+  5. User receives email → clicks link → lands on /update-password
+  6. /update-password page styled and functional → password update works
+  7. All buttons show success/error toasts
+  8. No duplicate Supabase client warnings
+  9. Build and TypeScript check pass
+
+- **Technical Implementation Details**:
+  - Uses existing useIsSuperAdmin() hook for access control
+  - Integrates with AuthContext.forgotPassword() method
+  - Maintains existing admin-reset-password edge function as fallback
+  - Toast system provides immediate user feedback
+  - ConfirmDialog prevents accidental admin actions
+  - Responsive design works on all screen sizes
+  - Dark mode support throughout
+
+- **Date**: 2024-12-19
+- **Commit**: feat(admin/users): Super Admin–only Password Management with reset-by-email, breadcrumb & Back button; UI refresh via shadcn/tailwind; docs in BugTracking.md
+
+## Enhancement: Migrate to Invite-by-Email & Harden Password Flows (2024-12-19)
+- **Title**: Migrate to Invite-by-Email & Harden Password Flows
+- **Summary**: 
+  - Super Admin invites users via Supabase email; no temp passwords.
+  - On first sign-in, profile row upserted from user_metadata (role, name, initials, divisionId, unitId).
+  - RLS allows users to insert/update only their own row.
+  - Forgot password & change password flows verified.
+- **Problem Summary**: 
+  - User creation used temp passwords and edge functions, causing complexity and potential failures
+  - No automatic profile creation on first login
+  - RLS policies were overly permissive
+  - Password flows were scattered across multiple components
+
+- **Root Cause**: 
+  - addUser() called admin-create-user edge function with temp passwords
+  - No first-login profile upsert mechanism
+  - RLS policies allowed all operations for all users
+  - Legacy admin-reset-password still used in some flows
+
+- **Changes Made**:
+  - File: `src/contexts/AppContext.tsx` — replace addUser → invite
+    - Changed from edge function to `supabase.auth.admin.inviteUserByEmail`
+    - Removed temp password logic
+    - Added user metadata (role, division, unit) to invite
+  - File: `src/contexts/AuthContext.tsx` — first-login upsert
+    - Added `upsertUserProfile()` function for first-login profile creation
+    - Called on both initial session load and auth state changes
+    - Uses user_metadata from Auth user to populate public.users row
+  - File: `src/components/UserModal.tsx` — remove password UI
+    - Removed password input fields and generation
+    - Updated alerts to show "User invited" instead of "User created"
+    - Removed adminResetPassword calls
+  - File: `src/lib/*` — ensure singleton supabase client usage
+    - Verified all modules use shared client from `./supabase`
+    - No duplicate createClient usage found
+  - File: `database/users-rls-policies.sql` (NEW)
+    - Tightened RLS policies for users table
+    - Users can only insert/update their own row
+    - Read access for all authenticated users (for assignment purposes)
+
+- **Bugs found & fixed**:
+  - ✅ Invalid hook usage in non-component code (already fixed)
+  - ✅ Duplicate Supabase clients (already using singleton)
+  - ✅ Temp password creation causing 400/504/timeout paths (replaced with invite)
+  - ✅ No first-login profile creation (added upsert mechanism)
+
+- **Verification steps**:
+  1. Super Admin invites a user → email arrives.
+  2. User sets password via email link → signs in.
+  3. public/users row created/updated with correct metadata.
+  4. Forgot password email arrives and update works.
+  5. Logged-in user can change password via modal.
+  6. RLS: invited user cannot modify other users' rows.
+
+- **Date**: 2024-12-19
+- **Commit**: <hash>
+
 ## Fix: Auth user provisioning and password flows (2024-12-19)
 - **Title**: Fixed user creation to provision Auth users; implemented proper password flows
 - **Summary**: Resolved issues where user creation only inserted into users table without Auth provisioning; fixed password change modal and implemented proper forgot password flow

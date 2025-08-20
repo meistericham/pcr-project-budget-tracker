@@ -18,7 +18,7 @@ interface AuthContextType {
 
   // optional helpers you already referenced
   changePassword: (newPassword: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (email: string, redirectTo?: string) => Promise<void>;
   updateProfileName: (newName: string) => Promise<void>;
 
   // server-side (edge function) admin reset by super_admin
@@ -67,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(mapUser(u));
         if (u?.id) {
           await syncProfile();
+          await upsertUserProfile(data.session);
         } else {
           setRole(null);
           setProfile(null);
@@ -84,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(mapUser(u));
       if (u?.id) {
         syncProfile();
+        upsertUserProfile(session);
       } else {
         setRole(null);
         setProfile(null);
@@ -121,6 +123,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRole((p?.role as Role) ?? null);
     if (import.meta.env.DEV && p) {
       console.debug('[PROFILE] loaded', { email: p.email, role: p.role });
+    }
+  };
+
+  // First-login profile upsert (sync auth.users → public.users)
+  const upsertUserProfile = async (session: any): Promise<void> => {
+    const u = session?.user;
+    if (u?.id && u.email) {
+      const m = u.user_metadata || {};
+      const role = (m.role ?? 'user') as 'super_admin'|'admin'|'user';
+      const name = m.name ?? (u.email.split('@')[0] ?? 'User');
+      const initials = m.initials ?? (name ? name.split(' ').map((s: string) => s[0]).join('').slice(0,2).toUpperCase() : 'U');
+
+      try {
+        await supabase.from('users').upsert({
+          id: u.id,
+          name,
+          email: u.email,
+          role,
+          initials,
+          division_id: m.divisionId ?? null,
+          unit_id: m.unitId ?? null,
+          created_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+        
+        if (import.meta.env.DEV) {
+          console.debug('[AUTH] Profile upserted for first login:', { id: u.id, email: u.email, role });
+        }
+      } catch (err) {
+        console.error('[AUTH] Failed to upsert profile on first login:', err);
+      }
     }
   };
 
@@ -184,13 +216,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // forgot password (self-service)
-  const forgotPassword = async (email: string) => {
+  const forgotPassword = async (email: string, redirectTo?: string) => {
     setError(null);
-    const redirectTo = window.location.hostname === 'localhost'
+    
+    // Use provided redirectTo or fallback to current logic
+    const defaultRedirectTo = window.location.hostname === 'localhost'
       ? 'http://localhost:5173/update-password'
       : 'https://pcrtracker.meistericham.com/update-password';
     
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const finalRedirectTo = redirectTo || defaultRedirectTo;
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: finalRedirectTo });
     if (error) throw new Error(error.message);
   };
 

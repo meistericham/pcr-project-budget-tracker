@@ -1225,49 +1225,41 @@ const renameUnit = async (id: string, newName: string) => {
   const addUser = async (userData: Omit<User, 'id' | 'createdAt'>) => {
     let newUser: User;
     if (useServerDb) {
-      // Use the new admin-create-user edge function to properly provision Auth user + profile
+      // Use invite-by-email instead of temp password creation
       try {
-        console.log('[AppContext] Creating user via admin-create-user edge function:', userData);
+        console.log('[AppContext] Inviting user via email:', userData);
         
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            email: userData.email,
-            password: 'temp123', // Temporary password that user will reset
-            name: userData.name,
-            role: userData.role,
-            divisionId: userData.divisionId,
-            unitId: userData.unitId,
-            initials: userData.initials
-          })
+        const meta = {
+          name: userData.name,
+          initials: userData.initials,
+          role: userData.role,          // 'admin' | 'user'
+          divisionId: (userData as any).divisionId ?? null,
+          unitId: (userData as any).unitId ?? null,
+        };
+
+        const { data, error } = await supabase.auth.admin.inviteUserByEmail(userData.email, {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          data: meta,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }));
-          throw new Error(`${errorData.error} (${errorData.code || 'NO_CODE'})`);
-        }
-
-        const result = await response.json();
-        console.log('[AppContext] User created successfully:', result);
         
-        // Create User object from the response
+        if (error) throw error;
+
+        // Create optimistic User object for UI
         newUser = {
-          id: result.userId,
-          name: result.user.name,
-          email: result.user.email,
-          role: result.user.role,
-          initials: result.user.initials,
-          divisionId: result.user.divisionId,
-          unitId: result.user.unitId,
+          id: data?.user?.id || `invited-${Date.now()}`, // Temporary ID until first login
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          initials: userData.initials,
+          divisionId: (userData as any).divisionId,
+          unitId: (userData as any).unitId,
           createdAt: new Date().toISOString()
         } as User;
         
+        console.log('[Admin] Invite sent:', data?.user?.email);
+        
       } catch (error) {
-        console.error('[AppContext] Failed to create user via edge function:', error);
+        console.error('[AppContext] Failed to invite user:', error);
         throw error;
       }
     } else {
@@ -1280,8 +1272,8 @@ const renameUnit = async (id: string, newName: string) => {
     notifyUsers(
       adminUsers.map(u => u.id).filter(id => id !== user?.id),
       'user_assigned',
-      'New User Added',
-      `${creatorName} added a new user: ${newUser.name} (${newUser.role.replace('_', ' ')})`,
+      'New User Invited',
+      `${creatorName} invited a new user: ${newUser.name} (${newUser.role.replace('_', ' ')})`,
       { userId: newUser.id },
     );
   };
