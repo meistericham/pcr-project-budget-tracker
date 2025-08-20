@@ -54,6 +54,13 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Coerce budget to number with validation
+    const budget = Number(formData.budget) || 0;
+    if (isNaN(budget) || budget < 0) {
+      alert('Please enter a valid budget amount (must be a positive number)');
+      return;
+    }
+    
     const projectData = {
       name: formData.name,
       description: formData.description,
@@ -61,8 +68,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
       priority: formData.priority,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      budget: parseFloat(formData.budget),
-      spent: project?.spent || 0,
+      budget: budget,
+      spent: 0, // Always start with 0 spent for new projects
       assignedUsers: formData.assignedUsers,
       budgetCodes: formData.budgetCodes,
       unitId: formData.unitId,

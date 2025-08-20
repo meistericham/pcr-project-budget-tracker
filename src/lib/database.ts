@@ -353,25 +353,31 @@ export const projectService = {
     }
   },
 
-  async create(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
+    async create(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     if (useServerDb) {
       if (import.meta.env.DEV) console.log('[SRV] projects.create → supabase', project);
+      
+      // Coerce numeric fields with safe defaults
+      const payload = {
+        name: project.name,
+        description: project.description,
+        status: project.status,
+        priority: project.priority,
+        start_date: project.startDate,
+        end_date: project.endDate,
+        budget: Number(project.budget ?? 0),
+        spent: Number(project.spent ?? 0),
+        assigned_users: project.assignedUsers || [],
+        budget_codes: project.budgetCodes || [],
+        unit_id: (project as any).unitId || null,   // ✅ map camelCase → snake_case
+        created_by: project.createdBy
+      };
+      
+      console.debug('[SRV] projects.create final payload:', payload);
+      
       const { data, error } = await supabase
         .from('projects')
-        .insert({
-          name: project.name,
-          description: project.description,
-          status: project.status,
-          priority: project.priority,
-          start_date: project.startDate,
-          end_date: project.endDate,
-          budget: project.budget,
-          spent: project.spent,
-          assigned_users: project.assignedUsers,
-          budget_codes: project.budgetCodes,
-          unit_id: (project as any).unitId,   // ✅ map camelCase → snake_case
-          created_by: project.createdBy
-        })
+        .insert(payload)
         .select()
         .single();
       
@@ -381,22 +387,26 @@ export const projectService = {
     
     // fallback local
     if (import.meta.env.DEV) console.log('[SRV] projects.create → local', project);
+    
+    // Coerce numeric fields with safe defaults for local mode too
+    const payload = {
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      priority: project.priority,
+      start_date: project.startDate,
+      end_date: project.endDate,
+      budget: Number(project.budget ?? 0),
+      spent: Number(project.spent ?? 0),
+      assigned_users: project.assignedUsers || [],
+      budget_codes: project.budgetCodes || [],
+      unit_id: (project as any).unitId || null,   // ✅ map camelCase → snake_case
+      created_by: project.createdBy
+    };
+    
     const { data, error } = await supabase
       .from('projects')
-      .insert({
-        name: project.name,
-        description: project.description,
-        status: project.status,
-        priority: project.priority,
-        start_date: project.startDate,
-        end_date: project.endDate,
-        budget: project.budget,
-        spent: project.spent,
-        assigned_users: project.assignedUsers,
-        budget_codes: project.budgetCodes,
-        unit_id: (project as any).unitId,   // ✅ map camelCase → snake_case
-        created_by: project.createdBy
-      })
+      .insert(payload)
       .select()
       .single();
     

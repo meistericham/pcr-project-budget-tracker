@@ -1,5 +1,47 @@
 # Bug / Issue Log
 
+## Bug: Project create fails with 400 (budget null) (2024-12-19)
+- **Title**: Project creation fails with 400 error due to null budget/spent values
+- **Summary**: Fixed 400 error "null value in column 'budget' of relation 'projects' violates not-null constraint" when creating projects
+- **Problem Summary**: 
+  - UI was sending budget as empty string or null to NOT NULL database columns
+  - Database had no defaults for budget and spent columns
+  - Service layer wasn't coercing numeric values properly
+  - Project creation failed with 400 error
+
+- **Root Cause**: 
+  - ProjectModal form allowed empty budget input
+  - handleSubmit used parseFloat() which could result in NaN
+  - database.ts projectService.create didn't coerce numeric fields
+  - Database columns had no default values for budget/spent
+
+- **Changes Made**:
+  - File: `src/components/ProjectModal.tsx`
+    - Added budget validation: `const budget = Number(formData.budget) || 0`
+    - Added validation error for non-numeric/negative values
+    - Always set spent to 0 for new projects
+    - Pass numeric budget to addProject (not string)
+  - File: `src/lib/database.ts`
+    - Enhanced projectService.create with numeric coercion
+    - Added safe defaults: `budget: Number(project.budget ?? 0)`, `spent: Number(project.spent ?? 0)`
+    - Added console.debug logging of final payload before insert
+    - Applied same fixes to both server and local modes
+  - File: `database/fix-project-budget-defaults.sql` (NEW)
+    - SQL to set database defaults: `ALTER TABLE projects ALTER COLUMN budget SET DEFAULT 0`
+    - SQL to set database defaults: `ALTER TABLE projects ALTER COLUMN spent SET DEFAULT 0`
+    - Verification query to confirm changes
+
+- **Verification Steps**:
+  1. Run SQL in Supabase: `database/fix-project-budget-defaults.sql`
+  2. Create new project with budget input
+  3. Check Network request payload includes `"budget": <number>` and `"spent": 0`
+  4. Confirm response 200/201 and project appears immediately
+  5. Refresh page - project persists and renders correctly
+- **Next**: Project creation should now work without 400 errors
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (pending)
+
 ## Enhancement: Step B — Persist settings to Supabase with role guard (2024-12-19)
 - **Title**: In server mode, settings save path writes to app_settings singleton; super_admin can write all fields; admin/user restricted to theme
 - **Summary**: Implemented Step B of settings persistence enhancement - writing settings to Supabase with role-based restrictions
