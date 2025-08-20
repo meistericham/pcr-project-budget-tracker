@@ -1278,36 +1278,48 @@ const renameUnit = async (id: string, newName: string) => {
     );
   };
 
-    const updateUser = async (id: string, updates: Partial<User>) => {
+    // inside AppProvider
+const updateUser = async (id: string, updates: Partial<User>) => {
+  const editingSelf = user?.id === id;                        // `user` from useAuth()
+  const isSA = (profile?.role ?? 'user') === 'super_admin';   // `profile` from useAuth()
+
+  // Build a safe payload
+  const safe: Partial<User> = { ...updates };
+
+  // Never allow these through from UI
+  delete (safe as any).id;
+  delete (safe as any).created_at;
+  delete (safe as any).createdAt;
+  delete (safe as any).email; // email changes must go through Auth
+
+  // Only Super Admin can change division/unit (including their own)
+  if (!isSA) {
+    delete (safe as any).division_id;
+    delete (safe as any).unit_id;
+    delete (safe as any).divisionId;
+    delete (safe as any).unitId;
+  }
+
+  // Only Super Admin can change role — but never their own role
+  if (!isSA || editingSelf) {
+    delete (safe as any).role;
+  }
+
+  try {
     if (useServerDb) {
-      try {
-        // Call the service and get the authoritative row from DB
-        const saved = await userService.update(id, updates);
-
-        // Update local state with the fresh row
-        setUsers(prev =>
-          prev.map(u => (u.id === id ? saved : u))
-        );
-
-        // If the current user updated themselves, refresh profile
-        if (user?.id === id) {
-          // Note: refreshCurrentUser is available in AuthContext, but we can't call it here
-          // The calling component should handle profile refresh if needed
-        }
-
-        return saved;
-      } catch (err) {
-        console.error('[AppContext.updateUser] Failed to update user:', err);
-        throw err;
-      }
+      const saved = await userService.update(id, safe);
+      setUsers(prev => prev.map(u => (u.id === id ? saved : u)));
+      return saved;
     } else {
-      // Local (mock) mode
-      setUsers(prev =>
-        prev.map(u => (u.id === id ? { ...u, ...updates } : u))
-      );
-      return { ...(users.find(u => u.id === id) as User), ...updates };
+      setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...safe } : u)));
+      const current = users.find(u => u.id === id) as User | undefined;
+      return current ? { ...current, ...safe } : (safe as User);
     }
-  };
+  } catch (err) {
+    console.error('[AppContext.updateUser] Failed to update user:', err);
+    throw err;
+  }
+};
 
   const deleteUser = async (id: string) => {
     if (useServerDb) {

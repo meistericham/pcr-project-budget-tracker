@@ -141,31 +141,51 @@ export const userService = {
 
   async update(id: string, updates: Partial<User>): Promise<User> {
     try {
-      // Build payload: include only provided fields; allow explicit null to clear org fields
-      const payload: Record<string, any> = {
-        ...(updates.name !== undefined ? { name: updates.name } : {}),
-        ...(updates.email !== undefined ? { email: updates.email } : {}),
-        ...(updates.role !== undefined ? { role: updates.role } : {}),
-        ...(updates.initials !== undefined ? { initials: updates.initials } : {}),
-        ...(updates.divisionId !== undefined ? { division_id: updates.divisionId } : {}), // can be string or null
-        ...(updates.unitId !== undefined ? { unit_id: updates.unitId } : {}),             // can be string or null
-      };
+      // Build a minimal patch (snake_case for db)
+      const patch: Record<string, any> = {};
+      if (updates.name !== undefined) patch.name = updates.name;
+      if (updates.role !== undefined) patch.role = updates.role; // SA‑only (guarded at AppContext/UI)
+      if (updates.initials !== undefined) patch.initials = updates.initials;
+      if ('divisionId' in updates) patch.division_id = updates.divisionId; // allows string|null
+      if ('unitId' in updates) patch.unit_id = updates.unitId;             // allows string|null
+  
+      // Never let these slip in via PATCH
+      delete (patch as any).id;
+      delete (patch as any).email;
+      delete (patch as any).created_at;
+      delete (patch as any).createdAt;
+  
       console.log('[userService.update] id →', id);
-      console.log('[userService.update] payload →', payload);
-      
-      const { data, error } = await supabase
+      console.log('[userService.update] patch →', patch);
+  
+      // No-op guard
+      if (Object.keys(patch).length === 0) {
+        const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+        if (error) throw error;
+        return transformUser(data);
+      }
+  
+      const { data, error, status } = await supabase
         .from('users')
-        .update(payload)
+        .update(patch)
         .eq('id', id)
         .select('*')
         .single();
   
       if (error) {
-        if (error.message?.includes('Only super_admin can change division_id or unit_id')) {
+        if (error.message?.includes('Only super administrators')) {
           throw new Error('Permission denied: Only super administrators can change division or unit assignments.');
         }
         throw error;
       }
+  
+      // Some PostgREST versions can 204 on update; fallback fetch
+      if (!data) {
+        const { data: row, error: selErr } = await supabase.from('users').select('*').eq('id', id).single();
+        if (selErr) throw selErr;
+        return transformUser(row);
+      }
+  
       return transformUser(data);
     } catch (err) {
       console.error('[userService.update] Error:', err);
