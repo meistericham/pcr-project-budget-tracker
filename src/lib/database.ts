@@ -107,7 +107,7 @@ export const userService = {
       }
 
       const { data, error } = await supabase
-        .from('users')
+        .from('users_active')     //  ← View only includes real Auth users
         .select('*')
         .order('created_at', { ascending: false });
 
