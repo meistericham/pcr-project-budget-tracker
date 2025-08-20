@@ -1,5 +1,50 @@
 # Bug / Issue Log
 
+## Fix: Auth user provisioning and password flows (2024-12-19)
+- **Title**: Fixed user creation to provision Auth users; implemented proper password flows
+- **Summary**: Resolved issues where user creation only inserted into users table without Auth provisioning; fixed password change modal and implemented proper forgot password flow
+- **Problem Summary**: 
+  - Admin user creation only inserted into `users` table without creating Supabase Auth user
+  - PasswordChangeModal had incorrect function signature
+  - Forgot password flow was working but not centralized in AuthContext
+  - No proper Auth user provisioning for new users
+
+- **Root Cause**: 
+  - `userService.create()` only called database insert, no Auth API calls
+  - PasswordChangeModal called `changePassword(currentPassword, newPassword)` but AuthContext expected only `newPassword`
+  - AuthPage used direct supabase client instead of centralized AuthContext functions
+  - Missing edge function for proper Auth user + profile provisioning
+
+- **Changes Made**:
+  - File: `supabase/functions/admin-create-user/index.ts` (NEW)
+    - Created edge function that creates Auth user first, then upserts app profile
+    - Uses service role to bypass RLS for profile creation
+    - Proper error handling and cleanup if profile creation fails
+  - File: `src/contexts/AppContext.tsx`
+    - Updated `addUser` to use new admin-create-user edge function
+    - Ensures both Auth user and app profile are created
+    - Added debug logging for user creation process
+  - File: `src/contexts/AuthContext.tsx`
+    - Added `forgotPassword` function for centralized password reset
+    - Fixed `adminResetPassword` to use environment variable instead of protected supabaseUrl
+    - Added proper error handling and logging
+  - File: `src/components/PasswordChangeModal.tsx`
+    - Fixed function call to use correct `changePassword(newPassword)` signature
+    - Removed incorrect currentPassword parameter
+  - File: `src/components/AuthPage.tsx`
+    - Updated to use centralized `forgotPassword` function from AuthContext
+    - Removed direct supabase client usage for password reset
+
+- **Verification Steps**:
+  1. **Admin Create User**: Create user as super_admin → should create both auth.users and app users rows
+  2. **Forgot Password**: Click "Forgot password?" → email sent → link opens recovery screen → password update works
+  3. **Change Password**: Logged-in user can change password via PasswordChangeModal
+  4. **Auth Flow**: New users can sign in with temporary password and reset it
+- **Next**: All auth flows now properly provision Auth users and handle password management
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (pending)
+
 ## Fix: Budget Entry categories didn't reflect Settings (2024-12-19)
 - **Title**: Budget Entry categories didn't reflect Settings immediately after saving
 - **Summary**: Fixed issue where adding new categories in Settings didn't show up in Add Budget Entry until full reload

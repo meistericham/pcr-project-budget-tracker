@@ -17,6 +17,7 @@ import {
 import { getSettings, upsertSettings } from '../lib/settingsService';
 import { useAuth } from './AuthContext';
 import { useIsSuperAdmin } from '../lib/authz';
+import { supabase } from '../lib/supabase';
 import {
   User,
   Project,
@@ -1224,7 +1225,51 @@ const renameUnit = async (id: string, newName: string) => {
   const addUser = async (userData: Omit<User, 'id' | 'createdAt'>) => {
     let newUser: User;
     if (useServerDb) {
-      newUser = await userService.create(userData);
+      // Use the new admin-create-user edge function to properly provision Auth user + profile
+      try {
+        console.log('[AppContext] Creating user via admin-create-user edge function:', userData);
+        
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({
+            email: userData.email,
+            password: 'temp123', // Temporary password that user will reset
+            name: userData.name,
+            role: userData.role,
+            divisionId: userData.divisionId,
+            unitId: userData.unitId,
+            initials: userData.initials
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }));
+          throw new Error(`${errorData.error} (${errorData.code || 'NO_CODE'})`);
+        }
+
+        const result = await response.json();
+        console.log('[AppContext] User created successfully:', result);
+        
+        // Create User object from the response
+        newUser = {
+          id: result.userId,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role,
+          initials: result.user.initials,
+          divisionId: result.user.divisionId,
+          unitId: result.user.unitId,
+          createdAt: new Date().toISOString()
+        } as User;
+        
+      } catch (error) {
+        console.error('[AppContext] Failed to create user via edge function:', error);
+        throw error;
+      }
     } else {
       newUser = { ...userData, id: Date.now().toString(), createdAt: new Date().toISOString() } as User;
     }

@@ -5,7 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import EnvWarning from './EnvWarning';
 
 const AuthPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, forgotPassword } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -49,17 +49,8 @@ const AuthPage: React.FC = () => {
     }
     try {
       setIsSendingReset(true);
-      const redirectTo = window.location.hostname === 'localhost'
-        ? 'http://localhost:5173/update-password'
-        : 'https://pcrtracker.meistericham.com/update-password';
-      const { error: resetErrorResp } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo
-      });
-      if (resetErrorResp) {
-        setResetError(resetErrorResp.message);
-      } else {
-        setResetInfo('Check your email for the reset link.');
-      }
+      await forgotPassword(formData.email);
+      setResetInfo('Check your email for the reset link.');
     } catch (e) {
       setResetError(e instanceof Error ? e.message : 'Failed to initiate password reset');
     } finally {

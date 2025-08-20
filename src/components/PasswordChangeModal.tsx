@@ -40,7 +40,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ onClose }) =>
         throw new Error('New password must be different from current password');
       }
 
-      await changePassword(formData.currentPassword, formData.newPassword);
+      await changePassword(formData.newPassword);
       setSuccess(true);
       
       // Auto close after success

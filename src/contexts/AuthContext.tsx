@@ -18,6 +18,7 @@ interface AuthContextType {
 
   // optional helpers you already referenced
   changePassword: (newPassword: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
   updateProfileName: (newName: string) => Promise<void>;
 
   // server-side (edge function) admin reset by super_admin
@@ -182,6 +183,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw new Error(error.message);
   };
 
+  // forgot password (self-service)
+  const forgotPassword = async (email: string) => {
+    setError(null);
+    const redirectTo = window.location.hostname === 'localhost'
+      ? 'http://localhost:5173/update-password'
+      : 'https://pcrtracker.meistericham.com/update-password';
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw new Error(error.message);
+  };
+
   // update display name in your profiles table (if you store it there)
   const updateProfileName = async (newName: string) => {
     setError(null);
@@ -199,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const id = setTimeout(() => controller.abort(), 10000);
     
     try {
-      const res = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-reset-password`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), newPassword }),
@@ -237,6 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         changePassword,
+        forgotPassword,
         updateProfileName,
         adminResetPassword,
         reloadProfile: syncProfile,
