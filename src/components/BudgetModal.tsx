@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Calendar, Tag, Hash } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { BudgetEntry } from '../types';
@@ -10,7 +10,7 @@ interface BudgetModalProps {
 }
 
 const BudgetModal: React.FC<BudgetModalProps> = ({ entry, onClose }) => {
-  const { addBudgetEntry, updateBudgetEntry, projects, budgetCodes, currentUser, divisions, units } = useApp();
+  const { addBudgetEntry, updateBudgetEntry, projects, budgetCodes, currentUser, divisions, units, settings } = useApp();
   const [formData, setFormData] = useState({
     divisionId: '',
     unitId: '',
@@ -23,18 +23,24 @@ const BudgetModal: React.FC<BudgetModalProps> = ({ entry, onClose }) => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  const categories = [
-    'Design',
-    'Development',
-    'Marketing',
-    'Software',
-    'Research',
-    'Advertising',
-    'Equipment',
-    'Travel',
-    'Training',
-    'Other'
-  ];
+  // Build categories from settings reactively
+  const categories = useMemo(() => {
+    const raw = settings?.budgetCategories ?? [];
+    // normalize: trim, drop empties, dedupe (case-insensitive), sort
+    const cleaned = Array.from(
+      new Map(
+        raw
+          .map(s => (typeof s === 'string' ? s.trim() : ''))
+          .filter(Boolean)
+          .map(s => [s.toLowerCase(), s]) // key = lowercase, value = original
+      ).values()
+    );
+    // Ensure "Other" always present at end
+    if (!cleaned.some(c => c.toLowerCase() === 'other')) cleaned.push('Other');
+    return cleaned.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [settings?.budgetCategories]);
+
+  console.debug('[BudgetModal] categories from settings:', categories);
 
   // Get available budget codes for selected project
   const selectedProject = projects.find(p => p.id === formData.projectId);

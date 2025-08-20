@@ -1,5 +1,41 @@
 # Bug / Issue Log
 
+## Fix: Budget Entry categories didn't reflect Settings (2024-12-19)
+- **Title**: Budget Entry categories didn't reflect Settings immediately after saving
+- **Summary**: Fixed issue where adding new categories in Settings didn't show up in Add Budget Entry until full reload
+- **Problem Summary**: 
+  - Category <select> sourced from static hardcoded array instead of `settings.budgetCategories`
+  - New categories added in Settings didn't appear in Budget Entry modal until page reload
+  - Some components used hardcoded category lists instead of reactive settings
+
+- **Root Cause**: 
+  - BudgetModal.tsx had hardcoded `const categories = ['Design', 'Development', ...]`
+  - No reactive connection to `settings.budgetCategories` from AppContext
+  - Settings changes didn't trigger category list updates in real-time
+
+- **Changes Made**:
+  - File: `src/components/BudgetModal.tsx`
+    - Removed hardcoded categories array
+    - Added `useMemo` hook to compute categories from `settings.budgetCategories`
+    - Implemented normalization: trim, dedupe (case-insensitive), sort
+    - Always ensures "Other" category is present
+    - Added debug logging: `[BudgetModal] categories from settings: ...`
+  - File: `src/contexts/AppContext.tsx`
+    - Added debug log: `[AppContext] settings updated in state; categories: ...`
+    - Confirmed `setSettings()` calls trigger immediate re-renders
+  - File: `src/components/SettingsView.tsx`
+    - Confirmed existing clean save logic: `budgetCategories.split(',').map(cat => cat.trim()).filter(Boolean)`
+
+- **Verification Steps**:
+  1. Add "Sponsorship" in Settings → Budget Categories → Save
+  2. Open Add Budget Entry → Category: "Sponsorship" should appear immediately (no reload)
+  3. As Admin/User: cannot edit categories (by role), but select shows updated list
+  4. Works in both local and server modes
+- **Next**: Budget Entry categories now update reactively with Settings changes
+
+- **Date**: 2024-12-19
+- **Commit Hash**: (pending)
+
 ## Bug: Project create fails with 400 (budget null) (2024-12-19)
 - **Title**: Project creation fails with 400 error due to null budget/spent values
 - **Summary**: Fixed 400 error "null value in column 'budget' of relation 'projects' violates not-null constraint" when creating projects

@@ -1361,6 +1361,8 @@ const renameUnit = async (id: string, newName: string) => {
       const userRole = profile?.role ?? 'user';
       const isSuperAdmin = userRole === 'super_admin';
 
+      console.debug('[AppContext] settings updated in state; categories:', (newSettings as any)?.budgetCategories);
+
       // For non-super-admins, block restricted keys (companyName, currency)
       const restrictedKeys: (keyof AppSettings)[] = ['companyName', 'currency'];
       const filtered = isSuperAdmin
