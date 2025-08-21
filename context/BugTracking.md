@@ -602,6 +602,72 @@
 - **Date**: 2024-12-19
 - **Commit Hash**: 56eb14f
 
+## Bug Fix: Profile sync overwrote users row with nulls (2024-12-19)
+- **Title**: Fix profile sync to stop overwriting users with nulls; trust JWT role; remove bad updated_at select
+- **Summary**: 
+  - Fixed profile sync that was blindly upserting user data and overwriting division_id/unit_id with nulls
+  - Replaced blind upsert with SELECT→create-or-patch merge-only flow
+  - Enhanced JWT role prioritization to never demote existing roles
+  - Added reentrancy guard to prevent multiple simultaneous profile syncs
+  - Added dev-only debugging sentinel for JWT vs DB role comparison
+
+- **Problem Summary**: 
+  - Profile sync was using blind upsert with onConflict: 'id' which could overwrite existing data
+  - Division/unit assignments were being nullified on page reload or auth state changes
+  - No protection against role demotion (JWT role could overwrite higher DB role)
+  - Multiple simultaneous profile syncs could cause race conditions
+  - Missing debugging information for troubleshooting auth/role issues
+
+- **Root Cause**: 
+  - `upsertUserProfile` function used `supabase.from('users').upsert()` with `onConflict: 'id'`
+  - This would overwrite all fields including division_id/unit_id with null values from metadata
+  - No role hierarchy protection - JWT role could demote existing higher roles
+  - No reentrancy protection for multiple auth state changes
+  - Missing defensive logging and debugging tools
+
+- **Changes Made**:
+  - File: `src/contexts/AuthContext.tsx` — implemented merge-only profile sync
+    - Replaced blind upsert with SELECT→create-or-patch approach
+    - Added role hierarchy protection: never demote existing roles
+    - Only update fields that are explicitly available and safe
+    - Added reentrancy guard using Set to prevent multiple simultaneous syncs
+    - Enhanced logging: mode=create/update, existingRow, patch details
+  - File: `src/lib/authz.ts` — enhanced Super Admin role checking
+    - Added JWT vs DB role tracking for debugging
+    - Maintained JWT-first approach (already implemented correctly)
+    - Added dev-only sentinel showing { jwtRole, dbRole, allowed } status
+  - File: `src/App.tsx` — added debugging sentinel
+    - Dev-only yellow banner showing authz role information
+    - Positioned at top-left for easy visibility during development
+
+- **Bugs found & fixed**:
+  - ✅ Profile sync overwriting division_id/unit_id with nulls (fixed with merge-only approach)
+  - ✅ Blind upsert causing data loss (replaced with SELECT→create-or-patch)
+  - ✅ Role demotion vulnerability (added role hierarchy protection)
+  - ✅ Race conditions in profile sync (added reentrancy guard)
+  - ✅ Missing debugging information (added JWT vs DB role sentinel)
+
+- **Verification steps**:
+  1. Login as super_admin and assign division/unit via UI
+  2. Hard reload page - verify no POST/UPSERT with division_id:null, unit_id:null
+  3. Check dev console for profile sync logs: mode=create/update, existingRow, patch
+  4. Verify division/unit assignments persist across reloads
+  5. Log out/in - values persist, JWT role remains super_admin
+  6. Access /admin/users works correctly
+  7. Dev sentinel shows correct JWT vs DB role information
+  8. Build and TypeScript check pass
+
+- **Technical Implementation Details**:
+  - Merge-only sync: SELECT existing row, then create new or patch only changed fields
+  - Role protection: user < admin < super_admin hierarchy prevents demotion
+  - Reentrancy guard: Set-based tracking prevents multiple simultaneous syncs
+  - JWT prioritization: app_metadata.role trusted over user_metadata.role
+  - Defensive logging: detailed console output for troubleshooting in dev mode
+  - No impact on RLS policies or server-side functionality
+
+- **Date**: 2024-12-19
+- **Commit**: fix(auth/profile-sync): stop overwriting users with nulls; trust JWT role; remove bad updated_at select
+
 ## Enhancement: De-duplicate User Actions across Admin pages (2024-12-19)
 - **Title**: De-duplicate User Actions across Admin pages with shared, prop-driven table component
 - **Summary**: 

@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
+  const [profileSyncInProgress, setProfileSyncInProgress] = useState<Set<string>>(new Set());
 
   // Seed from current session + subscribe to changes
   useEffect(() => {
@@ -126,17 +127,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // First-login profile upsert (sync auth.users → public.users)
+  // First-login profile sync (sync auth.users → public.users) - merge-only approach
   const upsertUserProfile = async (session: any): Promise<void> => {
     const u = session?.user;
-    if (u?.id && u.email) {
-      const m = u.user_metadata || {};
-      const role = (m.role ?? 'user') as 'super_admin'|'admin'|'user';
-      const name = m.name ?? (u.email.split('@')[0] ?? 'User');
-      const initials = m.initials ?? (name ? name.split(' ').map((s: string) => s[0]).join('').slice(0,2).toUpperCase() : 'U');
+    if (!u?.id || !u.email) return;
 
-      try {
-        await supabase.from('users').upsert({
+    // Reentrancy guard - prevent multiple simultaneous syncs for the same user
+    if (profileSyncInProgress.has(u.id)) {
+      if (import.meta.env.DEV) {
+        console.debug('[AUTH] Profile sync already in progress for user:', u.id);
+      }
+      return;
+    }
+
+    setProfileSyncInProgress(prev => new Set(prev).add(u.id));
+
+    const m = u.user_metadata || {};
+    const jwtRole = (u.app_metadata?.role as 'super_admin'|'admin'|'user') || null;
+    const metadataRole = (m.role ?? 'user') as 'super_admin'|'admin'|'user';
+    
+    // Prefer JWT role over metadata role
+    const role = jwtRole || metadataRole;
+    const name = m.name ?? (u.email.split('@')[0] ?? 'User');
+    const initials = m.initials ?? (name ? name.split(' ').map((s: string) => s[0]).join('').slice(0,2).toUpperCase() : 'U');
+
+    try {
+      // First, check if user row exists
+      const { data: existingRow, error: selectError } = await supabase
+        .from('users')
+        .select('id, role, division_id, unit_id, name, email, initials, created_at')
+        .eq('id', u.id)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('[AUTH] Failed to check existing user:', selectError);
+        return;
+      }
+
+      if (!existingRow) {
+        // Creating new user row
+        const newUserData = {
           id: u.id,
           name,
           email: u.email,
@@ -145,14 +175,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           division_id: m.divisionId ?? null,
           unit_id: m.unitId ?? null,
           created_at: new Date().toISOString()
-        }, { onConflict: 'id' });
-        
-        if (import.meta.env.DEV) {
-          console.debug('[AUTH] Profile upserted for first login:', { id: u.id, email: u.email, role });
+        };
+
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert(newUserData);
+
+        if (insertError) {
+          console.error('[AUTH] Failed to create user profile:', insertError);
+          return;
         }
-      } catch (err) {
-        console.error('[AUTH] Failed to upsert profile on first login:', err);
+
+        if (import.meta.env.DEV) {
+          console.debug('[AUTH] Profile created for first login:', { id: u.id, email: u.email, role, mode: 'create' });
+        }
+      } else {
+        // User exists - only update fields that are explicitly available and safe
+        const patch: any = {};
+        
+        // Only update name if we have a better one (not empty)
+        if (name && name.trim() && name !== existingRow.name) {
+          patch.name = name;
+        }
+        
+        // Only update initials if we have better ones
+        if (initials && initials !== existingRow.initials) {
+          patch.initials = initials;
+        }
+        
+        // Only update role if we're promoting to a higher role
+        if (role && role !== existingRow.role) {
+          const roleHierarchy = { 'user': 1, 'admin': 2, 'super_admin': 3 };
+          const currentLevel = roleHierarchy[existingRow.role as keyof typeof roleHierarchy] || 0;
+          const newLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
+          
+          if (newLevel > currentLevel) {
+            patch.role = role;
+            if (import.meta.env.DEV) {
+              console.debug('[AUTH] Role promoted:', { from: existingRow.role, to: role, userId: u.id });
+            }
+          }
+        }
+        
+        // Only update if we have changes to make
+        if (Object.keys(patch).length > 0) {
+          const { error: updateError } = await supabase
+            .from('users')
+            .update(patch)
+            .eq('id', u.id);
+
+          if (updateError) {
+            console.error('[AUTH] Failed to update user profile:', updateError);
+            return;
+          }
+
+          if (import.meta.env.DEV) {
+            console.debug('[AUTH] Profile updated:', { id: u.id, patch, mode: 'update', existingRow });
+          }
+        } else if (import.meta.env.DEV) {
+          console.debug('[AUTH] No profile updates needed:', { id: u.id, existingRow });
+        }
       }
+    } catch (err) {
+      console.error('[AUTH] Failed to sync profile:', err);
+    } finally {
+      // Clear reentrancy guard
+      setProfileSyncInProgress(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(u.id);
+        return newSet;
+      });
     }
   };
 

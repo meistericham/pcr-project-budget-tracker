@@ -39,6 +39,12 @@ const AppContent = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Dev-only sentinel for authz debugging */}
+      {import.meta.env.DEV && (
+        <div id="__AUTHZ_ROLE_CHECK__" className="fixed top-0 left-0 z-50 bg-yellow-500 text-black text-xs p-1 font-mono">
+          Loading...
+        </div>
+      )}
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <TopNavigation />

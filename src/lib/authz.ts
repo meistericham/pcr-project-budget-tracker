@@ -9,6 +9,8 @@ export function useIsSuperAdmin(): {
   error?: string;
 } {
   const [state, setState] = useState<{allowed: boolean|null, role?: AppRole, error?: string}>({allowed: null});
+  const [jwtRole, setJwtRole] = useState<AppRole | null>(null);
+  const [dbRole, setDbRole] = useState<AppRole | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -18,11 +20,13 @@ export function useIsSuperAdmin(): {
         // 1. Get session JWT role as primary source of truth
         const { data: { session } } = await supabase.auth.getSession();
         const jwtRole = (session?.user?.app_metadata?.role as AppRole) || null;
+        setJwtRole(jwtRole);
         
         // 2. If JWT says super_admin, trust it immediately
         if (jwtRole === 'super_admin') {
           if (!alive) return;
           setState({ allowed: true, role: 'super_admin' });
+          setDbRole(null); // No DB lookup needed
           return;
         }
 
@@ -47,6 +51,7 @@ export function useIsSuperAdmin(): {
         }
 
         const dbRole = (data?.role ?? '').trim() as AppRole;
+        setDbRole(dbRole);
         if (!alive) return;
         setState({ allowed: dbRole === 'super_admin', role: dbRole });
       } catch (e: any) {
@@ -65,11 +70,13 @@ export function useIsSuperAdmin(): {
           try {
             const { data: { session } } = await supabase.auth.getSession();
             const jwtRole = (session?.user?.app_metadata?.role as AppRole) || null;
+            setJwtRole(jwtRole);
             
             // Trust JWT super_admin immediately
             if (jwtRole === 'super_admin') {
               if (!alive) return;
               setState({ allowed: true, role: 'super_admin' });
+              setDbRole(null); // No DB lookup needed
               return;
             }
 
@@ -93,6 +100,7 @@ export function useIsSuperAdmin(): {
             }
 
             const dbRole = (data?.role ?? '').trim() as AppRole;
+            setDbRole(dbRole);
             if (!alive) return;
             setState({ allowed: dbRole === 'super_admin', role: dbRole });
           } catch (e: any) {
@@ -109,6 +117,16 @@ export function useIsSuperAdmin(): {
       sub.data.subscription.unsubscribe(); 
     };
   }, []);
+
+  // Dev-only sentinel for debugging JWT vs DB role
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const sentinel = document.getElementById('__AUTHZ_ROLE_CHECK__');
+      if (sentinel) {
+        sentinel.textContent = `JWT: ${jwtRole || 'null'} | DB: ${dbRole || 'null'} | Allowed: ${state.allowed}`;
+      }
+    }
+  }, [jwtRole, dbRole, state.allowed]);
 
   return state;
 }
