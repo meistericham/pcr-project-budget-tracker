@@ -1,5 +1,47 @@
 # Verification Notes
 
+## Project Editing Permissions Testing
+
+### 1. Test Admin Editing Someone Else's Project
+1. **Login as admin** (not super_admin)
+2. **Navigate to Projects** and find a project you didn't create
+3. **Click Edit button** → should open ProjectModal (was blocked before)
+4. **Make changes and save** → should succeed
+5. **Check dev console** for: `[EDIT GUARD] { role: 'admin', createdBy: 'other-user-id', assigned: [...], me: 'your-id', allowed: true }`
+
+### 2. Test Creator Editing Own Project
+1. **Login as regular user**
+2. **Create a new project** or find one you created
+3. **Click Edit button** → should open ProjectModal
+4. **Make changes and save** → should succeed
+5. **Check dev console** for: `[EDIT GUARD] { role: 'user', createdBy: 'your-id', assigned: [...], me: 'your-id', allowed: true }`
+
+### 3. Test Assignee Editing Assigned Project
+1. **Login as regular user**
+2. **Find a project you're assigned to** (but didn't create)
+3. **Click Edit button** → should open ProjectModal
+4. **Make changes and save** → should succeed
+5. **Check dev console** for: `[EDIT GUARD] { role: 'user', createdBy: 'other-id', assigned: ['your-id', ...], me: 'your-id', allowed: true }`
+
+### 4. Test Unrelated User (Blocked)
+1. **Login as regular user**
+2. **Find a project you didn't create and aren't assigned to**
+3. **Click Edit button** → should show "Access Denied" modal
+4. **Check dev console** for: `[EDIT GUARD] { role: 'user', createdBy: 'other-id', assigned: [...], me: 'your-id', allowed: false }`
+
+### 5. Verify Dev Helper
+1. **Inspect Edit button** in browser dev tools
+2. **Look for hidden span** with `data-edit-guard="allowed"` or `data-edit-guard="blocked"`
+3. **Verify attribute matches** the actual permission status
+
+### Expected Results
+- ✅ Admin users can edit any project
+- ✅ Project creators can edit their own projects
+- ✅ Project assignees can edit assigned projects
+- ✅ Unrelated users still see Access Denied
+- ✅ Dev console shows detailed permission logs
+- ✅ Edit button has debug helper attribute
+
 ## User Invitation Flow Testing (Edge Function)
 
 ### 1. Deploy Edge Function

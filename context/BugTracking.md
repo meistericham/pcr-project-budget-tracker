@@ -1,5 +1,73 @@
 # Bug / Issue Log
 
+## 🚨 CRITICAL: Project Edit blocked in UI while RLS allows (admin) (2024-12-19)
+- **Title**: Project Edit blocked in UI while RLS allows (admin)
+- **Summary**: 
+  - Front-end edit guard in ProjectModal was blocking admin users from editing projects
+  - RLS policies already allow admin/super_admin to edit any project
+  - UI showed "Access Denied" modal even when backend would permit the update
+  - Permission logic was incomplete and didn't match RLS rules
+
+- **Problem Summary**: 
+  - ProjectModal used incomplete permission checking: `isSuperAdmin || (isAdmin && (!project))`
+  - This blocked admin users from editing existing projects
+  - RLS already permits: UPDATE when created_by = auth.uid() OR user is admin/super_admin OR auth.uid() is in assigned_users
+  - Front-end guard was more restrictive than backend policies
+
+- **Root Cause**: 
+  - Front-end guard logic was incomplete and didn't consider all RLS paths
+  - Permission check only allowed admins to create new projects, not edit existing ones
+  - Missing logic for creator and assignee permissions
+  - No centralized permission utility function
+
+- **Required Changes**:
+  - **Centralized Permission Logic**: Create `canEditProject()` utility in authz.ts
+  - **Complete Permission Check**: Allow edit if user is admin/super_admin OR creator OR assignee
+  - **Front-end Alignment**: Update ProjectModal to use new permission logic
+  - **Debug Logging**: Add dev console logs for permission decisions
+  - **Dev Helper**: Add hidden debug span showing permission status
+
+- **Target Behavior**:
+  - **Admin/Super Admin**: Can edit any project (existing behavior)
+  - **Creator**: Can edit their own projects (new)
+  - **Assignee**: Can edit projects they're assigned to (new)
+  - **Unrelated User**: Still blocked (existing behavior)
+  - **Debug Info**: Dev builds show permission status in hidden span
+
+- **Status**: ✅ RESOLVED - Permission logic aligned with RLS policies
+- **Priority**: P1 - Blocking admin functionality
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Resolution Summary**:
+  - Created `canEditProject()` utility function in authz.ts
+  - Updated ProjectModal to use centralized permission checking
+  - Added comprehensive debug logging for permission decisions
+  - Added dev-only debug helper showing permission status
+  - Aligned front-end permissions with existing RLS policies
+
+- **Files Changed**:
+  - `src/lib/authz.ts` - Added canEditProject utility function
+  - `src/components/ProjectModal.tsx` - Updated permission logic and UI messages
+  - `src/components/ProjectsView.tsx` - Added debug helper to Edit button
+  - `context/BugTracking.md` - Added bug entry with resolution details
+  - `context/VerificationNotes.md` - Added testing steps
+
+- **Verification Steps**:
+  1. **Admin editing someone else's project**: Should succeed (was blocked)
+  2. **Creator editing own project**: Should succeed (was blocked for non-admin)
+  3. **Assignee editing assigned project**: Should succeed (new functionality)
+  4. **Unrelated user**: Should still see "Access Denied" (unchanged)
+  5. **Dev console**: Should show [EDIT GUARD] debug logs
+  6. **Dev helper**: Edit button should have data-edit-guard attribute
+
+- **Test Cases**:
+  - [ ] Admin (not creator, assigned or unassigned): can open Edit modal and save
+  - [ ] Creator (user): can open Edit modal and save
+  - [ ] Assignee (user): can open Edit modal and save
+  - [ ] Unrelated user (not admin, not creator, not assigned): sees Access Denied dialog
+  - [ ] Failed UPDATE simulation: removing assignment still shows Access Denied
+
 ## 🚨 CRITICAL: Add User Flow Using Direct Client Calls (2024-12-19)
 - **Title**: Fix "Add User" flow to use Supabase Edge Function instead of direct client calls
 - **Summary**: 

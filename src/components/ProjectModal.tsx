@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Users, Hash, AlertTriangle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useIsSuperAdmin } from '../lib/authz';
+import { useAuth } from '../contexts/AuthContext';
+import { canEditProject } from '../lib/authz';
 import { Project } from '../types';
 import { formatMYR } from '../utils/currency';
 
@@ -12,7 +13,7 @@ interface ProjectModalProps {
 
 const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   const { addProject, updateProject, users, budgetCodes, divisions, units } = useApp();
-  const { allowed: isSA } = useIsSuperAdmin();
+  const { user: currentUser, profile } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -28,8 +29,20 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   });
 
   const activeBudgetCodes = budgetCodes.filter(code => code.isActive);
-  const isSuperAdmin = !!isSA;
-  const isAdmin = !!isSA; // tighten to super admin only for mutations
+  
+  // Check if user can edit this project using the new utility function
+  const canEdit = canEditProject(project, { id: currentUser?.id || '', role: profile?.role });
+  
+  // Debug logging in development
+  if (import.meta.env.DEV && project) {
+    console.debug('[EDIT GUARD]', { 
+      role: profile?.role, 
+      createdBy: project.createdBy, 
+      assigned: project.assignedUsers, 
+      me: currentUser?.id, 
+      allowed: canEdit 
+    });
+  }
 
   useEffect(() => {
     if (project) {
@@ -109,10 +122,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
   // };
 
   // Check if user can edit this project
-  const canEdit = isSuperAdmin || 
-    (isAdmin && (!project)) ||
-    (!project);
-
   if (!canEdit && project) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -196,21 +205,21 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Project['status'] }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                disabled={!isSuperAdmin && !isAdmin}
-              >
+                              <select
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Project['status'] }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  disabled={!canEdit}
+                >
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
                 <option value="on_hold">On Hold</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              {!isSuperAdmin && !isAdmin && (
+              {!canEdit && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Only admins can change project status
+                  You don't have permission to change project status
                 </p>
               )}
             </div>
@@ -306,11 +315,11 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="0.00"
-                disabled={!isSuperAdmin && !isAdmin}
+                disabled={!canEdit}
               />
-              {!isSuperAdmin && !isAdmin && (
+              {!canEdit && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Only admins can modify budget
+                  You don't have permission to modify budget
                 </p>
               )}
             </div>
@@ -331,7 +340,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
           )}
 
           {/* Budget Codes */}
-          {(isSuperAdmin || isAdmin) && (
+          {canEdit && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                 <Hash className="inline h-4 w-4 mr-1" />
@@ -393,7 +402,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
                     checked={formData.assignedUsers.includes(user.id)}
                     onChange={() => handleUserToggle(user.id)}
                     className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                      disabled={!isSuperAdmin && !isAdmin}
+                      disabled={!canEdit}
                   />
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -407,24 +416,23 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
                 </label>
               ))}
             </div>
-            {!isSuperAdmin && !isAdmin && (
+            {!canEdit && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                You can only assign yourself to projects. Admins can assign any team member.
+                You don't have permission to assign team members to this project.
               </p>
             )}
           </div>
 
           {/* Permissions Info */}
-          {!isSuperAdmin && (
+          {!canEdit && (
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <h4 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
                 Your Permissions:
               </h4>
               <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
-                <li>• You can edit project details and assign team members</li>
-                {isAdmin && <li>• As an admin, you can modify budget and status</li>}
-                {!isAdmin && <li>• Budget and status changes require admin privileges</li>}
-                <li>• Super admins have full control over all projects</li>
+                <li>• You don't have permission to edit this project</li>
+                <li>• Only project creators, assignees, and administrators can edit</li>
+                <li>• Contact an administrator if you need access</li>
               </ul>
             </div>
           )}

@@ -18,7 +18,8 @@ import {
   Mail
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { useIsSuperAdmin } from '../lib/authz';
+import { useAuth } from '../contexts/AuthContext';
+import { useIsSuperAdmin, canEditProject } from '../lib/authz';
 import { Project } from '../types';
 import { formatMYR } from '../utils/currency';
 import { formatDate } from '../utils/date';
@@ -29,6 +30,7 @@ import EmailModal from './EmailModal';
 
 const ProjectsView = () => {
   const { projects, users, budgetCodes, budgetEntries, deleteProject, divisions, units } = useApp();
+  const { user: currentUser, profile } = useAuth();
   const { allowed: isSA } = useIsSuperAdmin();
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
@@ -244,6 +246,13 @@ const ProjectsView = () => {
                       title="Edit Project"
                     >
                       <Edit3 className="h-4 w-4" />
+                      {import.meta.env.DEV && (
+                        <span 
+                          aria-hidden="true" 
+                          data-edit-guard={canEditProject(project, { id: currentUser?.id || '', role: profile?.role }) ? 'allowed' : 'blocked'}
+                          className="hidden"
+                        />
+                      )}
                     </button>
                     <button
                       onClick={(e) => {

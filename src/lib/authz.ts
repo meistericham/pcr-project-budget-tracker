@@ -3,6 +3,22 @@ import { supabase } from './supabase';
 
 export type AppRole = 'super_admin' | 'admin' | 'user';
 
+// Utility function to check if user can edit a project
+export function canEditProject(project: any, user: { id: string; role?: AppRole }): boolean {
+  if (!user || !user.id) return false;
+  
+  // Super admin and admin can edit any project
+  if (user.role === 'super_admin' || user.role === 'admin') return true;
+  
+  // Creator can edit their own project
+  if (project.createdBy === user.id) return true;
+  
+  // Assignee can edit projects they're assigned to
+  if (Array.isArray(project.assignedUsers) && project.assignedUsers.includes(user.id)) return true;
+  
+  return false;
+}
+
 export function useIsSuperAdmin(): {
   allowed: boolean | null;
   role?: AppRole;
