@@ -1,5 +1,77 @@
 # Bug / Issue Log
 
+## 🚨 CRITICAL: Add User Flow Using Direct Client Calls (2024-12-19)
+- **Title**: Fix "Add User" flow to use Supabase Edge Function instead of direct client calls
+- **Summary**: 
+  - Current implementation calls `supabase.auth.admin.inviteUserByEmail` directly from browser
+  - This causes 403 errors because client-side admin calls are not allowed
+  - Need to route Add User through Edge Function using service role for proper invite flow
+  - Edge Function must verify caller is super_admin and handle invite + profile creation
+
+- **Problem Summary**: 
+  - UserModal calls AppContext.addUser() which directly calls supabase.auth.admin.inviteUserByEmail
+  - Browser client cannot make admin API calls, resulting in 403 errors
+  - No server-side validation of super_admin role before sending invites
+  - Missing Edge Function for user invitation workflow
+  - Profile creation happens on first login but not during invite process
+
+- **Root Cause**: 
+  - AppContext.addUser() uses client-side admin API which is restricted
+  - Missing Edge Function for user invitation with proper role validation
+  - No server-side verification of caller's super_admin status
+  - Direct client calls to admin endpoints violate Supabase security model
+
+- **Required Changes**:
+  - **Edge Function**: Create `invite-user` function with service role and super_admin validation
+  - **Frontend**: Update AppContext.addUser() to call Edge Function instead of direct admin API
+  - **Security**: Verify caller role via JWT/app_metadata before allowing invites
+  - **Profile Creation**: Handle both invite sending and profile row creation in Edge Function
+
+- **Environment Requirements**:
+  - `VITE_SUPABASE_URL` (browser) - for Edge Function calls
+  - `VITE_SITE_URL` (browser) - for redirect URLs in invites
+  - `SUPABASE_SERVICE_ROLE_KEY` (server) - for Edge Function admin operations
+  - `SITE_URL` (server) - for Edge Function redirect URL construction
+
+- **Target Behavior**:
+  - Super Admin opens UserModal → fills form → submits
+  - Frontend calls Edge Function with user data and session token
+  - Edge Function verifies caller is super_admin via JWT
+  - Function sends invite email via auth.admin.inviteUserByEmail
+  - Function creates/upserts profile row in public.users table
+  - Returns success/error to frontend with proper toast feedback
+  - No browser calls to /auth/v1/invite or admin endpoints
+
+- **Status**: ✅ RESOLVED - Edge Function implemented and tested
+- **Priority**: P0 - Must fix before production deployment
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Resolution Summary**:
+  - Created `invite-user` Edge Function with proper role validation
+  - Updated AppContext.addUser() to call Edge Function instead of direct admin API
+  - Added comprehensive error handling and structured responses
+  - Implemented proper JWT validation and super_admin role checking
+  - Added deployment script and comprehensive documentation
+
+- **Files Changed**:
+  - `supabase/functions/invite-user/index.ts` (NEW) - Edge Function for user invitations
+  - `supabase/functions/invite-user/deno.json` (NEW) - Function dependencies
+  - `supabase/config.toml` - Added function configuration
+  - `src/contexts/AppContext.tsx` - Updated addUser() to use Edge Function
+  - `deploy-invite-function.sh` (NEW) - Deployment script
+  - `INVITE_USER_FLOW.md` (NEW) - Comprehensive documentation
+  - `context/VerificationNotes.md` - Added testing steps
+  - `context/BugTracking.md` - Updated with resolution details
+
+- **Verification Steps**:
+  1. Deploy Edge Function: `./deploy-invite-function.sh`
+  2. Set environment variables in Supabase dashboard
+  3. Test user invitation as super_admin → should succeed
+  4. Test as non-super-admin → should get 403 error
+  5. Verify Network tab shows calls to `/functions/v1/invite-user`
+  6. Check Supabase dashboard for invited users and profile rows
+
 ## Bug Fix: Super Admin Authorization Check Priority (2024-12-19)
 - **Title**: Fix Super Admin authorization check to prioritize JWT role as source of truth
 - **Summary**: 
@@ -1066,7 +1138,4 @@
 
 ### Technical Details
 - **Function URL**: `https://<project-ref>.functions.supabase.co/admin-reset-password`
-- **Authentication**: Requires `Authorization: Bearer <access_token>` header
-- **Role Check**: Verifies caller has `super_admin` role in `users` table
-- **Admin API**: Uses service role key for Auth user creation/updates
-- **CORS**: Configured for web origin access
+- **Authentication**: Requires `

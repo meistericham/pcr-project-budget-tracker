@@ -1225,28 +1225,46 @@ const renameUnit = async (id: string, newName: string) => {
   const addUser = async (userData: Omit<User, 'id' | 'createdAt'>) => {
     let newUser: User;
     if (useServerDb) {
-      // Use invite-by-email instead of temp password creation
+      // Use Edge Function for user invitation with proper role validation
       try {
-        console.log('[AppContext] Inviting user via email:', userData);
+        console.log('[AppContext] Inviting user via Edge Function:', userData);
         
-        const meta = {
-          name: userData.name,
-          initials: userData.initials,
-          role: userData.role,          // 'admin' | 'user'
-          divisionId: (userData as any).divisionId ?? null,
-          unitId: (userData as any).unitId ?? null,
-        };
+        // Get current session for authorization
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          throw new Error('No active session found');
+        }
 
-        const { data, error } = await supabase.auth.admin.inviteUserByEmail(userData.email, {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          data: meta,
+        // Call Edge Function with user data and session token
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            divisionId: (userData as any).divisionId ?? null,
+            unitId: (userData as any).unitId ?? null,
+          }),
         });
-        
-        if (error) throw error;
 
-        // Create optimistic User object for UI
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (!result.ok) {
+          throw new Error(result.error || 'Invite failed');
+        }
+
+        // Create User object from Edge Function response
         newUser = {
-          id: data?.user?.id || `invited-${Date.now()}`, // Temporary ID until first login
+          id: result.userId,
           name: userData.name,
           email: userData.email,
           role: userData.role,
@@ -1256,10 +1274,10 @@ const renameUnit = async (id: string, newName: string) => {
           createdAt: new Date().toISOString()
         } as User;
         
-        console.log('[Admin] Invite sent:', data?.user?.email);
+        console.log('[AppContext] User invited successfully via Edge Function:', result.message);
         
       } catch (error) {
-        console.error('[AppContext] Failed to invite user:', error);
+        console.error('[AppContext] Failed to invite user via Edge Function:', error);
         throw error;
       }
     } else {
