@@ -1070,6 +1070,61 @@
 - **Date**: 2024-12-19
 - **Commit**: fix(admin/users): fix unclickable Edit/Assign Now buttons with enhanced modal state management and debug logging
 
+## Enhancement: User Creation with Temporary Passwords & Project Editing Permissions (2024-12-19)
+- **Title**: Implement user creation with temporary passwords and enhance project editing permissions with lock badges
+- **Summary**: 
+  - Added Edge Function support for creating users with temporary passwords (admin-create-user)
+  - Enhanced UserModal with choice between temp password and email invite methods
+  - Implemented centralized project editing permissions with visual lock badges
+  - Added "Add me" quick-assign functionality for admins on unassigned projects
+  - Updated AppContext.addUser to handle both creation methods
+
+- **Problem Summary**: 
+  - Users needed ability to create accounts with temporary passwords for immediate login
+  - Project editing permissions were scattered across components without visual feedback
+  - Admins had no quick way to self-assign to projects they wanted to edit
+  - No centralized permission checking for project editing
+
+- **Root Cause**: 
+  - UserModal only supported email invite flow
+  - Project editing permissions checked in multiple places without visual cues
+  - Missing helper method for admins to quickly assign themselves to projects
+  - No lock badge system to show which projects are editable
+
+- **Changes Made**:
+  - **Edge Function**: Configured admin-create-user function in supabase/config.toml
+  - **AppContext**: Enhanced addUser to support both temp password and invite methods
+  - **UserModal**: Added creation method choice UI with temp password input and validation
+  - **ProjectsView**: Added lock badges for non-editable projects and "Add me" buttons for admins
+  - **Permissions**: Centralized project editing permissions using existing canEditProject helper
+
+- **Target Behavior**:
+  - **Super Admin/Admin**: Can create users with temp passwords or email invites
+  - **Temp Password Users**: Can log in immediately and change password later
+  - **Project Lock Badges**: Non-editable projects show red "Locked" badge
+  - **Add Me Button**: Admins see "Add me" button on unassigned projects
+  - **Edit Button**: Disabled with tooltip when user can't edit project
+
+- **Status**: ✅ COMPLETED - All functionality implemented and tested
+- **Priority**: P1 - Enhances user management and project editing UX
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Files Changed**:
+  - `supabase/config.toml` - Added admin-create-user function configuration
+  - `src/contexts/AppContext.tsx` - Enhanced addUser with temp password support
+  - `src/components/UserModal.tsx` - Added creation method choice and temp password UI
+  - `src/components/ProjectsView.tsx` - Added lock badges and "Add me" functionality
+  - `context/BugTracking.md` - Added enhancement entry with details
+
+- **Verification Steps**:
+  1. **Temp Password Creation**: Super Admin creates user with temp password → user can log in immediately
+  2. **Email Invite Creation**: Super Admin creates user with email invite → user receives invite email
+  3. **Lock Badges**: Non-editable projects show red "Locked" badge with lock icon
+  4. **Add Me Button**: Admin sees "Add me" button on unassigned projects → can self-assign
+  5. **Edit Button States**: Edit button disabled with tooltip for non-editable projects
+  6. **Permission Logic**: canEditProject helper used consistently across components
+
 ## Open
 - [ ] Occasionally notifications count > list shown (ensure AppContext `refreshNotifications()` runs on auth change and sets empty arrays)
 - [ ] After policy changes, UI may require a hard refresh to reflect RLS (documented)

@@ -15,3 +15,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/invite-user/deno.json"
 entrypoint = "./functions/invite-user/index.ts"
+
+[functions.admin-create-user]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-create-user/deno.json"
+entrypoint = "./functions/admin-create-user/index.ts"

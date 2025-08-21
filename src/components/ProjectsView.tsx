@@ -15,7 +15,8 @@ import {
   X,
   Hash,
   BarChart3,
-  Mail
+  Mail,
+  Lock
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,7 +30,7 @@ import ProjectDetailModal from './ProjectDetailModal';
 import EmailModal from './EmailModal';
 
 const ProjectsView = () => {
-  const { projects, users, budgetCodes, budgetEntries, deleteProject, divisions, units } = useApp();
+  const { projects, users, budgetCodes, budgetEntries, deleteProject, updateProject, divisions, units } = useApp();
   const { user: currentUser, profile } = useAuth();
   const { allowed: isSA } = useIsSuperAdmin();
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
@@ -97,6 +98,28 @@ const ProjectsView = () => {
   const handleEdit = (project: Project) => {
     setEditingProject(project);
     setShowModal(true);
+  };
+
+  // ✨ NEW: Handle adding current user to project
+  const handleAddMe = async (project: Project) => {
+    if (!currentUser?.id) return;
+    
+    try {
+      // Add current user to project's assigned users
+      const updatedAssignedUsers = [...project.assignedUsers, currentUser.id];
+      
+      // Update project via AppContext
+      await updateProject(project.id, {
+        assignedUsers: updatedAssignedUsers
+      });
+      
+      // Show success feedback (you can add toast here if available)
+      console.log(`[ProjectsView] Successfully added ${currentUser.id} to project ${project.id}`);
+      
+    } catch (error) {
+      console.error('[ProjectsView] Failed to add user to project:', error);
+      // You can add error toast here if available
+    }
   };
 
   const handleDelete = (project: Project) => {
@@ -207,6 +230,29 @@ const ProjectsView = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    {/* ✨ NEW: Lock Badge for non-editable projects */}
+                    {!canEditProject(project, { id: currentUser?.id || '', role: profile?.role }) && (
+                      <div className="flex items-center space-x-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-700 dark:text-red-300">
+                        <Lock className="h-3 w-3" />
+                        <span>Locked</span>
+                      </div>
+                    )}
+                    
+                    {/* ✨ NEW: Add Me button for admins/super_admins on unassigned projects */}
+                    {(profile?.role === 'admin' || profile?.role === 'super_admin') && 
+                     !project.assignedUsers.includes(currentUser?.id || '') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddMe(project);
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/30 rounded border border-blue-200 dark:border-blue-800 transition-colors"
+                        title="Add me to this project"
+                      >
+                        Add Me
+                      </button>
+                    )}
+                    
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -242,8 +288,17 @@ const ProjectsView = () => {
                         e.stopPropagation();
                         handleEdit(project);
                       }}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
-                      title="Edit Project"
+                      className={`p-1 ${
+                        canEditProject(project, { id: currentUser?.id || '', role: profile?.role })
+                          ? 'text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400'
+                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                      }`}
+                      title={
+                        canEditProject(project, { id: currentUser?.id || '', role: profile?.role })
+                          ? 'Edit Project'
+                          : "You're not assigned. Ask an admin to add you, or click Add me."
+                      }
+                      disabled={!canEditProject(project, { id: currentUser?.id || '', role: profile?.role })}
                     >
                       <Edit3 className="h-4 w-4" />
                       {import.meta.env.DEV && (

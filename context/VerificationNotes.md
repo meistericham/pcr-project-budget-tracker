@@ -149,3 +149,89 @@ Paste these commands in the browser console after building to verify user divisi
 - If user ID is null: User not logged in
 - If database values don't change: Check RLS policies or update logic
 - If UI doesn't update: Check AppContext state management
+
+## User Creation with Temporary Passwords Testing
+
+### 1. Test Temporary Password Creation
+1. **Login as super_admin** and navigate to User Management
+2. **Click "Add User"** button → UserModal opens
+3. **Verify default selection**: "Set temporary password now" should be selected
+4. **Fill form** with:
+   - Name: "Temp User"
+   - Email: "temp@example.com" (unique email)
+   - Role: "user" or "admin"
+   - Division: Select any division
+   - Unit: Select any unit
+5. **Password field**: Should show with validation (min 8 chars)
+6. **Click "Generate"** → should generate 12-character secure password
+7. **Submit form** → should see:
+   - Network request to `/functions/v1/admin-create-user` (200 OK)
+   - Success toast: "User created with temporary password. They can log in and change it later."
+   - Modal closes
+   - New user appears in users list
+
+### 2. Test Email Invite Creation
+1. **In UserModal**, select "Send invite email" radio button
+2. **Password field should disappear** (not needed for email invite)
+3. **Submit form** → should see:
+   - Network request to `/functions/v1/invite-user` (200 OK)
+   - Success toast: "User invited successfully. They will receive an email to set their password."
+   - Modal closes
+   - New user appears in users list
+
+### 3. Test Role Restrictions
+1. **As admin user** (not super_admin):
+   - Try to create super_admin account → should be blocked
+   - Try to create admin/user account → should succeed
+2. **As regular user**:
+   - Try to create any account → should be blocked
+
+### 4. Verify Edge Function Response
+Check Network tab for successful admin-create-user response:
+```json
+{
+  "ok": true,
+  "userId": "uuid-here",
+  "message": "User created successfully with temporary password"
+}
+```
+
+## Project Editing Permissions & Lock Badges Testing
+
+### 1. Test Lock Badge Display
+1. **Login as regular user** and navigate to Projects
+2. **Find a project you didn't create and aren't assigned to**
+3. **Hover over project card** → should see:
+   - Red "Locked" badge with lock icon
+   - Edit button disabled with tooltip: "You're not assigned. Ask an admin to add you, or click Add me."
+
+### 2. Test "Add Me" Functionality
+1. **Login as admin or super_admin**
+2. **Find a project you're not assigned to**
+3. **Hover over project card** → should see:
+   - Blue "Add Me" button
+   - Edit button enabled (admin can edit any project)
+4. **Click "Add Me"** → should:
+   - Add you to project's assigned users
+   - Show success in console: "Successfully added [user-id] to project [project-id]"
+   - Project becomes editable for you
+
+### 3. Test Edit Button States
+1. **As project creator**: Edit button should be enabled
+2. **As project assignee**: Edit button should be enabled
+3. **As admin/super_admin**: Edit button should be enabled for all projects
+4. **As unrelated user**: Edit button should be disabled with explanatory tooltip
+
+### 4. Verify Permission Logic
+1. **Check dev console** for canEditProject debug logs
+2. **Inspect Edit button** for data-edit-guard attribute
+3. **Verify RLS enforcement**: Database should reject invalid updates
+
+### Expected Results
+- ✅ Temporary password creation works end-to-end
+- ✅ Email invite creation works as before
+- ✅ Lock badges show for non-editable projects
+- ✅ "Add Me" button appears for admins on unassigned projects
+- ✅ Edit button states reflect actual permissions
+- ✅ canEditProject helper used consistently
+- ✅ No direct client calls to admin endpoints for temp password path

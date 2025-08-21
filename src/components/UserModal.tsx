@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { X, User, Users, Mail, Shield, Crown, Building2 } from 'lucide-react';
+import { X, User, Users, Mail, Shield, Crown, Building2, Key, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { User as UserType, Division, Unit } from '../types';
@@ -24,6 +24,10 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user, onSuccess, onError 
     divisionId: user?.divisionId ?? '',
     unitId: user?.unitId ?? '',
   });
+
+  // ✨ NEW: user creation method choice
+  const [creationMethod, setCreationMethod] = useState<'tempPassword' | 'emailInvite'>('tempPassword');
+  const [tempPassword, setTempPassword] = useState('');
 
   // keep form in sync when "user" prop changes
   useEffect(() => {
@@ -137,9 +141,16 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user, onSuccess, onError 
       }
     } else {
       try {
-        // create (invite-by-email flow handled in AppContext.addUser)
-        await addUser(userData);
-        onSuccess?.('User invited successfully. They will receive an email to set their password.');
+        // ✨ NEW: handle different creation methods
+        if (creationMethod === 'tempPassword') {
+          // Use centralized AppContext.addUser with temp password method
+          await addUser(userData, { method: 'tempPassword', password: tempPassword });
+          onSuccess?.('User created with temporary password. They can log in and change it later.');
+        } else {
+          // Use existing invite-by-email flow
+          await addUser(userData, { method: 'invite' });
+          onSuccess?.('User invited successfully. They will receive an email to set their password.');
+        }
         if (import.meta.env.DEV) {
           console.log('[UserModal] User created successfully, closing modal');
         }
@@ -175,6 +186,90 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user, onSuccess, onError 
 
         {/* Form - Scrollable Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto">
+          {/* ✨ NEW: User Creation Method Choice (only for new users) */}
+          {!user && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                User Creation Method
+              </label>
+              
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="creationMethod"
+                    value="tempPassword"
+                    checked={creationMethod === 'tempPassword'}
+                    onChange={(e) => setCreationMethod(e.target.value as 'tempPassword' | 'emailInvite')}
+                    className="text-blue-600"
+                  />
+                  <div className="flex items-center space-x-2">
+                    <Key className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm">Set temporary password now</span>
+                  </div>
+                </label>
+                
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="creationMethod"
+                    value="emailInvite"
+                    checked={creationMethod === 'emailInvite'}
+                    onChange={(e) => setCreationMethod(e.target.value as 'tempPassword' | 'emailInvite')}
+                    className="text-blue-600"
+                  />
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">Send invite email</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* ✨ NEW: Temporary Password Input */}
+              {creationMethod === 'tempPassword' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Temporary Password
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={tempPassword}
+                      onChange={(e) => setTempPassword(e.target.value)}
+                      placeholder="Enter temporary password"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+                        let password = '';
+                        for (let i = 0; i < 12; i++) {
+                          password += chars.charAt(Math.floor(Math.random() * chars.length));
+                        }
+                        setTempPassword(password);
+                      }}
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    {tempPassword.length >= 8 ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className={tempPassword.length >= 8 ? 'text-green-600' : 'text-red-600'}>
+                      {tempPassword.length >= 8 ? 'Password is valid' : 'Password must be at least 8 characters'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
