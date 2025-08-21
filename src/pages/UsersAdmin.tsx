@@ -29,6 +29,9 @@ export default function UsersAdmin() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
 
+  // Combined modal state for cleaner management
+  const isModalOpen = showUserModal && editUser !== null;
+
   // tiny debug (only in dev)
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -120,20 +123,46 @@ export default function UsersAdmin() {
   };
 
   const handleEditUser = (user: User) => {
-    console.log('[AdminUsers] CLICK:edit-user', user.id);
-    setEditUser(user);
-    setShowUserModal(true);
+    if (import.meta.env.DEV) {
+      console.log('[AdminUsers] Opening edit modal for user:', user.id);
+    }
+    
+    // Close any existing modal first to prevent state conflicts
+    if (showUserModal) {
+      setShowUserModal(false);
+      setEditUser(null);
+    }
+    
+    // Use setTimeout to ensure state is reset before opening new modal
+    setTimeout(() => {
+      setEditUser(user);
+      setShowUserModal(true);
+    }, 10);
   };
 
   const handleAssignNow = (user: User) => {
-    console.log('[AdminUsers] CLICK:assign-now', user.id);
-    setEditUser(user);
-    setShowUserModal(true);
+    if (import.meta.env.DEV) {
+      console.log('[AdminUsers] Opening assign modal for user:', user.id);
+    }
+    
+    // Close any existing modal first to prevent state conflicts
+    if (showUserModal) {
+      setShowUserModal(false);
+      setEditUser(null);
+    }
+    
+    // Use setTimeout to ensure state is reset before opening new modal
+    setTimeout(() => {
+      setEditUser(user);
+      setShowUserModal(true);
+    }, 10);
   };
 
   const handleUserModalClose = () => {
+    console.log('[AdminUsers] Closing modal, resetting state');
     setShowUserModal(false);
     setEditUser(null);
+    console.log('[AdminUsers] Modal state reset');
   };
 
   const handleUserUpdate = async (updatedUser: User) => {
@@ -152,6 +181,11 @@ export default function UsersAdmin() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Debug sentinel for role check */}
       <span id="__APP_ROLE_CHECK__" className="sr-only">{String(allowed)}:{role || 'unknown'}</span>
+      
+      {/* Debug sentinel for modal state */}
+      <span id="__MODAL_STATE__" className="sr-only">
+        showUserModal: {String(showUserModal)}, editUser: {editUser ? editUser.id : 'null'}
+      </span>
 
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
@@ -269,7 +303,11 @@ export default function UsersAdmin() {
                       <div className="flex items-center space-x-2">
                         {/* Assign Now Button */}
                         <button
-                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:assign-now', u.id); handleAssignNow(u); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            console.log('[AdminUsers] CLICK:assign-now', u.id);
+                            handleAssignNow(u); 
+                          }}
                           disabled={isLoading[u.id]}
                           className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Assign division and unit"
@@ -280,7 +318,11 @@ export default function UsersAdmin() {
 
                         {/* Edit User Button */}
                         <button
-                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:edit-user', u.id); handleEditUser(u); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            console.log('[AdminUsers] CLICK:edit-user', u.id);
+                            handleEditUser(u); 
+                          }}
                           disabled={isLoading[u.id]}
                           className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-blue-100 dark:bg-blue-700 border border-blue-300 dark:border-blue-600 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit user details"
@@ -337,6 +379,39 @@ export default function UsersAdmin() {
             </div>
           </div>
         </div>
+
+        {/* Debug Info Box */}
+        {import.meta.env.DEV && (
+          <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Debug Info</h3>
+                <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                  <p><strong>Modal State:</strong> showUserModal: {String(showUserModal)}, editUser: {editUser ? editUser.id : 'null'}</p>
+                  <p><strong>Combined State:</strong> isModalOpen: {String(isModalOpen)}</p>
+                  <p><strong>Role Check:</strong> allowed: {String(allowed)}, role: {role || 'unknown'}</p>
+                  <p><strong>Users Count:</strong> {users.length}</p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    onClick={() => {
+                      console.log('[AdminUsers] Test button clicked');
+                      setEditUser(users[0] || null);
+                      setShowUserModal(true);
+                      console.log('[AdminUsers] Test modal state set');
+                    }}
+                    className="px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                  >
+                    Test Modal (Debug)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Confirm dialog */}
@@ -352,9 +427,9 @@ export default function UsersAdmin() {
       />
 
       {/* User Modal */}
-      {showUserModal && editUser && (
+      {isModalOpen && (
         <UserModal
-          isOpen={showUserModal}
+          isOpen={isModalOpen}
           onClose={handleUserModalClose}
           user={editUser}
         />

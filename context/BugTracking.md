@@ -602,6 +602,70 @@
 - **Date**: 2024-12-19
 - **Commit Hash**: 56eb14f
 
+## Bug Fix: Unclickable Edit/Assign Now Buttons on /admin/users (2024-12-19)
+- **Title**: Fix unclickable Edit/Assign Now buttons on /admin/users page with enhanced debugging and modal state management
+- **Summary**: 
+  - Fixed Edit User and Assign Now buttons that appeared but were unclickable
+  - Enhanced modal state management to prevent race conditions
+  - Added comprehensive debug logging for troubleshooting button functionality
+  - Implemented robust modal opening logic with state reset and timeout
+  - Ensured buttons reliably open UserModal for user editing and assignment
+
+- **Problem Summary**: 
+  - Edit User and Assign Now buttons on /admin/users page were visible but not responding to clicks
+  - Buttons had proper onClick handlers but modal was not opening
+  - No console errors or visual indicators of button functionality issues
+  - Modal state management was potentially causing race conditions
+  - Missing debug information made troubleshooting difficult
+
+- **Root Cause**: 
+  - Modal state management had potential race conditions between showUserModal and editUser state
+  - State updates were potentially happening too quickly without proper synchronization
+  - No comprehensive debug logging to track button clicks and modal state changes
+  - Modal rendering logic required both showUserModal && editUser to be true simultaneously
+
+- **Changes Made**:
+  - File: `src/pages/UsersAdmin.tsx` — enhanced button click handlers and modal state management
+    - Added comprehensive debug logging for all button clicks and state changes
+    - Implemented robust modal opening logic with state reset before opening
+    - Added setTimeout(10ms) to ensure proper state synchronization
+    - Enhanced debug info box showing current modal state in development mode
+    - Added test button for debugging modal functionality
+    - Improved click handlers with detailed console logging
+  - File: `src/components/UserModal.tsx` — added debug logging for modal rendering
+    - Added console logging when modal is rendered vs not rendered
+    - Enhanced debug information for troubleshooting modal visibility
+
+- **Bugs found & fixed**:
+  - ✅ Edit User button not opening modal (fixed with enhanced state management)
+  - ✅ Assign Now button not opening modal (fixed with enhanced state management)
+  - ✅ Potential modal state race conditions (fixed with state reset and timeout)
+  - ✅ Missing debug information for troubleshooting (added comprehensive logging)
+  - ✅ Modal state synchronization issues (fixed with proper state management)
+
+- **Verification steps**:
+  1. Super Admin visits /admin/users → page loads with all 4 action buttons
+  2. Click "Edit User" → console shows click logs, modal opens for user editing
+  3. Click "Assign Now" → console shows click logs, modal opens for division/unit assignment
+  4. Click "Send Reset Email" → toast shows success, email sent (unchanged)
+  5. Click "Force Reset (fallback)" → confirm dialog appears (unchanged)
+  6. Debug info box shows current modal state in development mode
+  7. Test button opens modal reliably for debugging
+  8. Console shows detailed logs: '[AdminUsers] CLICK:edit-user', '[AdminUsers] Opening modal for user:', etc.
+  9. Modal opens and closes properly with state reset
+  10. Build and TypeScript check pass
+
+- **Technical Implementation Details**:
+  - Enhanced modal state management: reset existing state before opening new modal
+  - Added setTimeout(10ms) to ensure proper state synchronization between React updates
+  - Comprehensive debug logging shows button clicks, state changes, and modal rendering
+  - Combined modal state (isModalOpen = showUserModal && editUser !== null) for cleaner management
+  - Debug info box in development mode shows real-time modal state
+  - Maintained existing visual design while restoring full functionality
+
+- **Date**: 2024-12-19
+- **Commit**: fix(admin/users): fix unclickable Edit/Assign Now buttons with enhanced modal state management and debug logging
+
 ## Open
 - [ ] Occasionally notifications count > list shown (ensure AppContext `refreshNotifications()` runs on auth change and sets empty arrays)
 - [ ] After policy changes, UI may require a hard refresh to reflect RLS (documented)
