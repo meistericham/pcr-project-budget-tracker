@@ -602,6 +602,72 @@
 - **Date**: 2024-12-19
 - **Commit Hash**: 56eb14f
 
+## Enhancement: De-duplicate User Actions across Admin pages (2024-12-19)
+- **Title**: De-duplicate User Actions across Admin pages with shared, prop-driven table component
+- **Summary**: 
+  - Refactored user actions to remove UI redundancy between /admin/users and Users settings page
+  - Created shared UserTable component with configurable action visibility via props
+  - /admin/users now focuses on Password Management only (reset actions)
+  - Users settings page now has table view with Edit/Assign actions
+  - Maintained all existing functionality while improving code organization
+
+- **Problem Summary**: 
+  - /admin/users page had Edit/Assign buttons that duplicated functionality from Users settings
+  - Users settings page only had card view, no table view for bulk operations
+  - Code duplication between different user management interfaces
+  - No consistent way to manage user actions across different contexts
+
+- **Root Cause**: 
+  - Hard-coded action buttons in UsersAdmin.tsx without reusability
+  - UsersView.tsx only had card-based layout, no table view option
+  - Missing shared component architecture for user table functionality
+  - Actions were scattered across different components without clear separation of concerns
+
+- **Changes Made**:
+  - File: `src/components/UserTable.tsx` (NEW) — shared table component
+    - Configurable action visibility via props: showEdit, showAssign, showResetEmail, showForceReset
+    - Consistent styling and behavior across all usage contexts
+    - Proper event handling with e.stopPropagation() and z-index management
+    - Reusable across different pages with different action requirements
+  - File: `src/pages/UsersAdmin.tsx` — refactored to Password Management focus
+    - Removed Edit/Assign buttons, kept only password reset actions
+    - Updated page title and description to reflect new purpose
+    - Uses UserTable with showEdit=false, showAssign=false, showResetEmail=true, showForceReset=true
+    - Cleaner, focused interface for password management only
+  - File: `src/components/UsersView.tsx` — enhanced with table view option
+    - Added view mode toggle between cards and table
+    - Table view shows Edit and Assign actions for user management
+    - Uses UserTable with showEdit=true, showAssign=true, showResetEmail=false, showForceReset=false
+    - Maintains existing card view for detailed user information
+
+- **Bugs found & fixed**:
+  - ✅ UI redundancy between admin pages (eliminated with shared component)
+  - ✅ Missing table view in Users settings (added with toggle)
+  - ✅ Code duplication in user action handling (consolidated in UserTable)
+  - ✅ Inconsistent user management interfaces (standardized with props)
+
+- **Verification steps**:
+  1. Super Admin visits /admin/users → page shows "Password Management" with reset actions only
+  2. Super Admin visits Users settings → can toggle between cards and table views
+  3. Table view shows Edit and Assign buttons that open UserModal
+  4. Card view maintains existing functionality and layout
+  5. All buttons have proper click handlers with e.stopPropagation()
+  6. Modal z-index remains above table (z-50 vs z-10)
+  7. No overlay/pointer-events issues; all buttons clickable
+  8. Build and TypeScript check pass
+  9. Existing functionality preserved (password reset, user editing, division/unit assignment)
+
+- **Technical Implementation Details**:
+  - Shared UserTable component with boolean props for action visibility
+  - Consistent button styling and behavior across all contexts
+  - Proper event handling and modal state management
+  - View mode toggle in UsersView for flexible user management
+  - Maintained existing visual design and Tailwind/shadcn styling
+  - No impact on RLS policies or server-side functionality
+
+- **Date**: 2024-12-19
+- **Commit**: refactor(users): de-duplicate user actions with shared UserTable component, separate password management and user editing
+
 ## Bug Fix: Unclickable Edit/Assign Now Buttons on /admin/users (2024-12-19)
 - **Title**: Fix unclickable Edit/Assign Now buttons on /admin/users page with enhanced debugging and modal state management
 - **Summary**: 

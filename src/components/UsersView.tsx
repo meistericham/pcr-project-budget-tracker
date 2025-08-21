@@ -20,17 +20,20 @@ import { useIsSuperAdmin } from '../lib/authz';
 import { User as UserType } from '../types';
 import UserModal from './UserModal';
 import EmailModal from './EmailModal';
+import UserTable from './UserTable';
 
 const UsersView = () => {
   const { users, deleteUser, divisions, units } = useApp();
   const { allowed: isSA } = useIsSuperAdmin();
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'user'>('all');
   const [divisionFilter, setDivisionFilter] = useState<string | 'all'>('all');
   const [unitFilter, setUnitFilter] = useState<string | 'all'>('all');
   const [resetTarget, setResetTarget] = useState<UserType | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const isSuperAdmin = !!isSA;
 
@@ -71,7 +74,21 @@ const UsersView = () => {
       return;
     }
     setEditingUser(user);
-    setShowModal(true);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+  };
+
+  const handleAssign = (user: UserType) => {
+    if (!isSuperAdmin) {
+      alert('Only Super Admins can assign divisions and units.');
+      return;
+    }
+    setEditingUser(user);
+    setIsModalOpen(true);
   };
 
   const handleDelete = (user: UserType) => {
@@ -288,6 +305,51 @@ const UsersView = () => {
             </select>
           </div>
         </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                viewMode === 'cards'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Cards
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Table
+            </button>
+          </div>
+        </div>
+
+        {/* Table View */}
+        {viewMode === 'table' && (
+          <div className="mb-6">
+            <UserTable
+              users={filteredUsers}
+              divisions={divisions}
+              units={units}
+              isLoading={{}}
+              showEdit={true}
+              showAssign={true}
+              showResetEmail={false}
+              showForceReset={false}
+              onEdit={handleEdit}
+              onAssign={handleAssign}
+            />
+          </div>
+        )}
 
         {/* Users Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -510,10 +572,11 @@ const UsersView = () => {
       </div>
 
       {/* User Modal */}
-      {showModal && (
+      {isModalOpen && (
         <UserModal
+          isOpen={isModalOpen}
           user={editingUser}
-          onClose={handleCloseModal}
+          onClose={handleModalClose}
         />
       )}
 
