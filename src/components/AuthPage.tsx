@@ -91,6 +91,7 @@ const AuthPage: React.FC = () => {
       </div>
 
       {/* Quick Admin Login button (top-right) */}
+      {/*
       <button
         type="button"
         onClick={handleQuickAdminLogin}
@@ -99,6 +100,7 @@ const AuthPage: React.FC = () => {
       >
         {isQuickLoginLoading ? 'Logging in…' : 'Quick Admin Login'}
       </button>
+      */}
 
       {/* Confirmation banner */}
       {quickBannerMessage && (
