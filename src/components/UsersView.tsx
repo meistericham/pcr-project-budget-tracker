@@ -25,7 +25,6 @@ import UserTable from './UserTable';
 const UsersView = () => {
   const { users, deleteUser, divisions, units } = useApp();
   const { allowed: isSA } = useIsSuperAdmin();
-  const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +72,9 @@ const UsersView = () => {
       alert('Only Super Admins can edit user accounts.');
       return;
     }
+    if (import.meta.env.DEV) {
+      console.debug('[UsersView] Edit clicked', user.id);
+    }
     setEditingUser(user);
     setIsModalOpen(true);
   };
@@ -86,6 +88,9 @@ const UsersView = () => {
     if (!isSuperAdmin) {
       alert('Only Super Admins can assign divisions and units.');
       return;
+    }
+    if (import.meta.env.DEV) {
+      console.debug('[UsersView] Assign clicked', user.id);
     }
     setEditingUser(user);
     setIsModalOpen(true);
@@ -116,10 +121,7 @@ const UsersView = () => {
     setResetTarget(user);
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingUser(null);
-  };
+
 
   const canManageUsers = isSuperAdmin;
 
@@ -149,7 +151,7 @@ const UsersView = () => {
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative z-10">
       <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -164,7 +166,13 @@ const UsersView = () => {
             </div>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              if (import.meta.env.DEV) {
+                console.debug('[UsersView] Add User clicked');
+              }
+              setEditingUser(null);
+              setIsModalOpen(true);
+            }}
             className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
           >
             <Plus className="h-4 w-4" />
@@ -376,7 +384,10 @@ const UsersView = () => {
                 
                 <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => handleEdit(user)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(user);
+                    }}
                     className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                     title="Edit User"
                   >
@@ -453,7 +464,10 @@ const UsersView = () => {
                       </span>
                     </div>
                     <button
-                      onClick={() => handleEdit(user)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAssign(user);
+                      }}
                       className="text-xs text-yellow-700 dark:text-yellow-300 hover:text-yellow-800 dark:hover:text-yellow-200 underline"
                     >
                       Assign Now
@@ -560,7 +574,13 @@ const UsersView = () => {
             </p>
             {(!searchTerm && roleFilter === 'all' && divisionFilter === 'all' && unitFilter === 'all') && (
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => {
+                  if (import.meta.env.DEV) {
+                    console.debug('[UsersView] Add User clicked');
+                  }
+                  setEditingUser(null);
+                  setIsModalOpen(true);
+                }}
                 className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
               >
                 <Plus className="h-4 w-4" />

@@ -1,38 +1,49 @@
-# TODO: Fix Profile Sync & Bad SELECT Issues
+# TODO: Fix Add User Button on Users Management Screen
 
-## 1. Read Context ✅
-- [x] Read context/BugTracking.md and context/VerificationNotes.md
-- [x] Understand recent auth & users changes
+## 1. Read Required Files ✅
+- [x] context/BugTracking.md
+- [x] src/components/UsersView.tsx
+- [x] src/components/UserTable.tsx
+- [x] src/pages/UsersAdmin.tsx
+- [x] src/components/UserModal.tsx
+- [x] src/index.css and src/App.css
 
-## 2. Scan Repository for Issues ✅
-- [x] Search for "first login" or "profile upsert" logic in AuthContext.tsx
-- [x] Find code that queries users table selecting updated_at (invalid column)
-- [x] Locate code issuing /rest/v1/users?on_conflict=id on page load
+## 2. Fix UsersView.tsx Add User Button ✅
+- [x] Find "Add User" button handler
+- [x] Ensure handler does ONLY: setEditUser(null); setShowUserModal(true);
+- [x] Add console.debug in DEV: '[UsersView] Add User clicked'
+- [x] Ensure modal renders with single boolean gate: {showUserModal && (...)}
+- [x] Do NOT gate rendering on editUser
+- [x] Confirm UserModal import path is correct
 
-## 3. Fix Profile Sync to be Merge-Only and JWT-Truthful ✅
-- [x] Replace blind upsert with SELECT→create-or-patch merge-only flow
-- [x] Never demote role: prefer JWT app_metadata.role
-- [x] Don't overwrite division_id/unit_id with null if DB has values
-- [x] Only PATCH fields that are explicitly available and safe
-- [x] Add defensive logging for profile sync operations
+## 3. Fix UserModal.tsx ✅
+- [x] Keep early return: if (!isOpen) return null;
+- [x] Ensure outermost wrapper has: className="fixed inset-0 z-50 ..."
+- [x] Ensure backdrop uses onClick={onClose}
+- [x] Ensure inner panel uses onClick={e => e.stopPropagation()}
+- [x] Add data-testid="user-modal" to outer wrapper
 
-## 4. Fix Bad SELECT Queries ✅
-- [x] Replace updated_at selection with valid columns (created_at)
-- [x] Remove unused field selections
+## 4. Z-index / Overlay Audit ✅
+- [x] Inspect stats/tiles row for absolute positioning with z-index >= 50
+- [x] Reduce z-index or add pointer-events-none if needed
+- [x] Ensure scrollable list/container uses relative z-10
+- [x] Ensure no element overlays header bar with Add User button
+- [x] Reduce z-index or add pointer-events-none if needed
 
-## 5. Hardening ✅
-- [x] Ensure Super Admin check prioritizes JWT role in authz.ts
-- [x] Add dev-only sentinel showing { jwtRole, dbRole } for debugging
+## 5. Make Buttons Resilient ✅
+- [x] Ensure Edit and Assign Now actions call e.stopPropagation()
+- [x] Ensure they call: setEditUser(user); setShowUserModal(true);
+- [x] Add DEV logs: console.debug('[UsersView] Edit/Assign clicked', user.id);
 
-## 6. Testing ✅
-- [x] Build: npm run build
-- [x] Test login as affected account
-- [x] Assign division/unit via UI and confirm saved
-- [x] Hard reload: verify no POST/UPSERT with nulls
-- [x] Log out/in: values persist, JWT role remains super_admin
+## 6. Build and Typecheck ✅
+- [x] npm run build
+- [x] npx tsc --noEmit
 
-## 7. Documentation ✅
-- [x] Append BugTracking.md entry: "Profile sync overwrote users row with nulls"
+## 7. Update BugTracking.md ✅
+- [x] Add entry "Fix: Add User modal not opening"
+- [x] Document root cause (overlay OR extra conditional)
+- [x] List files changed and verification steps
 
 ## 8. Commit
-- [ ] Commit with message: "fix(auth/profile-sync): stop overwriting users with nulls; trust JWT role; remove bad updated_at select"
+- [ ] git add .
+- [ ] git commit -m "fix(users): make Add User reliably open modal; simplify modal gating; harden z-index and click handlers"

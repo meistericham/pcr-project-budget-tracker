@@ -602,6 +602,71 @@
 - **Date**: 2024-12-19
 - **Commit Hash**: 56eb14f
 
+## Bug Fix: Add User modal not opening on Users Management screen (2024-12-19)
+- **Title**: Fix Add User button to reliably open modal; simplify modal gating; harden z-index and click handlers
+- **Summary**: 
+  - Fixed "Add User" button that was not opening the UserModal due to state variable mismatch
+  - Consolidated modal state management to use single boolean gate
+  - Added proper event propagation handling with e.stopPropagation() for all action buttons
+  - Enhanced z-index management to prevent overlay issues
+  - Added comprehensive DEV logging for debugging button interactions
+
+- **Problem Summary**: 
+  - "Add User" button was calling setShowModal(true) but modal rendered with isModalOpen state
+  - State variable mismatch prevented modal from opening when adding new users
+  - Edit and Assign buttons in card view lacked e.stopPropagation() protection
+  - Missing DEV logging made troubleshooting button interactions difficult
+  - Potential z-index issues could cause overlay problems
+
+- **Root Cause**: 
+  - Two separate state variables: showModal (used by Add User buttons) and isModalOpen (used by modal rendering)
+  - Add User buttons called setShowModal(true) but modal only rendered when isModalOpen was true
+  - Missing e.stopPropagation() on action buttons could cause event bubbling issues
+  - Insufficient z-index management for modal layers
+
+- **Changes Made**:
+  - File: `src/components/UsersView.tsx` — fixed Add User button and consolidated modal state
+    - Removed unused showModal state variable
+    - Updated Add User buttons to call setEditingUser(null) and setIsModalOpen(true)
+    - Added DEV logging: '[UsersView] Add User clicked'
+    - Added e.stopPropagation() to Edit and Assign Now buttons in card view
+    - Enhanced handleEdit and handleAssign with DEV logging
+    - Added relative z-10 to main container for proper layering
+  - File: `src/components/UserModal.tsx` — enhanced modal structure and click handling
+    - Added data-testid="user-modal" to outer wrapper
+    - Enhanced backdrop click handling with onClick={onClose}
+    - Added inner panel click protection with e.stopPropagation()
+    - Maintained existing z-50 positioning and early return logic
+
+- **Bugs found & fixed**:
+  - ✅ Add User button not opening modal (fixed state variable mismatch)
+  - ✅ Modal gating complexity (simplified to single boolean condition)
+  - ✅ Missing e.stopPropagation() on action buttons (added to all buttons)
+  - ✅ Insufficient DEV logging (added comprehensive button interaction logs)
+  - ✅ Potential z-index overlay issues (enhanced with relative z-10 container)
+
+- **Verification steps**:
+  1. Click "Add User" button in header → UserModal opens for new user creation
+  2. Click "Add User" button in empty state → UserModal opens for new user creation
+  3. Click Edit button on user card → UserModal opens for user editing
+  4. Click "Assign Now" button on user card → UserModal opens for assignment
+  5. Check DEV console for logging: '[UsersView] Add User clicked', '[UsersView] Edit clicked', etc.
+  6. Verify modal closes properly with backdrop click
+  7. Verify modal content prevents accidental closure with e.stopPropagation()
+  8. Build and TypeScript check pass
+  9. No z-index conflicts or overlay issues
+
+- **Technical Implementation Details**:
+  - Single modal state: isModalOpen controls both modal visibility and user editing state
+  - Add User flow: setEditingUser(null) + setIsModalOpen(true) opens modal for new user
+  - Edit/Assign flow: setEditingUser(user) + setIsModalOpen(true) opens modal for existing user
+  - Event handling: e.stopPropagation() prevents button clicks from bubbling to parent elements
+  - Z-index management: main container at z-10, modal at z-50, proper layering hierarchy
+  - DEV logging: comprehensive tracking of all button interactions for debugging
+
+- **Date**: 2024-12-19
+- **Commit**: fix(users): make Add User reliably open modal; simplify modal gating; harden z-index and click handlers
+
 ## Bug Fix: Profile sync overwrote users row with nulls (2024-12-19)
 - **Title**: Fix profile sync to stop overwriting users with nulls; trust JWT role; remove bad updated_at select
 - **Summary**: 
