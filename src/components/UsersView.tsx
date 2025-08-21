@@ -21,10 +21,12 @@ import { User as UserType } from '../types';
 import UserModal from './UserModal';
 import EmailModal from './EmailModal';
 import UserTable from './UserTable';
+import { useToast } from './Toast';
 
 const UsersView = () => {
   const { users, deleteUser, divisions, units } = useApp();
   const { allowed: isSA } = useIsSuperAdmin();
+  const { showSuccess, showError } = useToast();
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -168,8 +170,9 @@ const UsersView = () => {
           <button
             onClick={() => {
               if (import.meta.env.DEV) {
-                console.debug('[UsersView] Add User clicked');
+                console.log('[UsersView] CLICK:AddUser');
               }
+              // Reset modal state before opening to prevent race conditions
               setEditingUser(null);
               setIsModalOpen(true);
             }}
@@ -576,8 +579,9 @@ const UsersView = () => {
               <button
                 onClick={() => {
                   if (import.meta.env.DEV) {
-                    console.debug('[UsersView] Add User clicked');
+                    console.log('[UsersView] CLICK:AddUser');
                   }
+                  // Reset modal state before opening to prevent race conditions
                   setEditingUser(null);
                   setIsModalOpen(true);
                 }}
@@ -597,6 +601,8 @@ const UsersView = () => {
           isOpen={isModalOpen}
           user={editingUser}
           onClose={handleModalClose}
+          onSuccess={(message) => showSuccess('Success', message)}
+          onError={(message) => showError('Error', message)}
         />
       )}
 

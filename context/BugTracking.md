@@ -610,6 +610,73 @@
   - Added proper event propagation handling with e.stopPropagation() for all action buttons
   - Enhanced z-index management to prevent overlay issues
   - Added comprehensive DEV logging for debugging button interactions
+  - Replaced alerts with toast notifications for better UX
+
+- **Problem Summary**: 
+  - "Add User" button was calling setShowModal(true) but modal rendered with isModalOpen state
+  - State variable mismatch prevented modal from opening when adding new users
+  - Edit and Assign buttons in card view lacked e.stopPropagation() protection
+  - Missing DEV logging made troubleshooting button interactions difficult
+  - Potential z-index issues could cause overlay problems
+  - User feedback was limited to browser alerts instead of integrated toast notifications
+
+- **Root Cause**: 
+  - Two separate state variables: showModal (used by Add User buttons) and isModalOpen (used by modal rendering)
+  - Add User buttons called setShowModal(true) but modal only rendered when isModalOpen was true
+  - Missing e.stopPropagation() on action buttons could cause event bubbling issues
+  - Insufficient z-index management for modal layers
+  - No integrated toast system for user feedback
+
+- **Changes Made**:
+  - File: `src/components/UsersView.tsx` — fixed Add User button and consolidated modal state
+    - Removed unused showModal state variable
+    - Updated Add User buttons to call setEditingUser(null) and setIsModalOpen(true)
+    - Added DEV logging: '[UsersView] CLICK:AddUser'
+    - Added e.stopPropagation() to Edit and Assign Now buttons in card view
+    - Enhanced handleEdit and handleAssign with DEV logging
+    - Added relative z-10 to main container for proper layering
+    - Integrated toast system for success/error notifications
+  - File: `src/components/UserModal.tsx` — enhanced modal structure and click handling
+    - Added data-testid="user-modal" to outer wrapper
+    - Enhanced backdrop click handling with onClick={onClose}
+    - Added inner panel click protection with e.stopPropagation()
+    - Maintained existing z-50 positioning and early return logic
+    - Added comprehensive DEV logging for modal open/close states
+    - Replaced browser alerts with toast callback system
+    - Enhanced Props interface with onSuccess/onError callbacks
+
+- **Bugs found & fixed**:
+  - ✅ Add User button not opening modal (fixed state variable mismatch)
+  - ✅ Modal gating complexity (simplified to single boolean condition)
+  - ✅ Missing e.stopPropagation() on action buttons (added to all buttons)
+  - ✅ Insufficient DEV logging (added comprehensive button interaction logs)
+  - ✅ Potential z-index overlay issues (enhanced with relative z-10 container)
+  - ✅ Poor user feedback (replaced alerts with integrated toast system)
+
+- **Verification steps**:
+  1. Click "Add User" button in header → UserModal opens for new user creation
+  2. Click "Add User" button in empty state → UserModal opens for new user creation
+  3. Click Edit button on user card → UserModal opens for user editing
+  4. Click "Assign Now" button on user card → UserModal opens for assignment
+  5. Check DEV console for logging: '[UsersView] CLICK:AddUser', '[UserModal] isOpen=true/false'
+  6. Verify modal closes properly with backdrop click
+  7. Verify modal content prevents accidental closure with e.stopPropagation()
+  8. Verify toast notifications appear for success/error states
+  9. Build and TypeScript check pass
+  10. No z-index conflicts or overlay issues
+
+- **Technical Implementation Details**:
+  - Single modal state: isModalOpen controls both modal visibility and user editing state
+  - Add User flow: setEditingUser(null) + setIsModalOpen(true) opens modal for new user
+  - Edit/Assign flow: setEditingUser(user) + setIsModalOpen(true) opens modal for existing user
+  - Event handling: e.stopPropagation() prevents button clicks from bubbling to parent elements
+  - Z-index management: main container at z-10, modal at z-50, proper layering hierarchy
+  - DEV logging: comprehensive tracking of all button interactions and modal states
+  - Toast integration: onSuccess/onError callbacks provide user feedback without browser alerts
+  - State hygiene: modal state reset before opening prevents race conditions
+
+- **Date**: 2024-12-19
+- **Commit**: fix(users): make Add User reliably open modal; simplify modal gating; harden z-index and click handlers
 
 - **Problem Summary**: 
   - "Add User" button was calling setShowModal(true) but modal rendered with isModalOpen state

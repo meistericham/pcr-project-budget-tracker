@@ -8,9 +8,11 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   user?: UserType | null; // when present = edit mode
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
 };
 
-const UserModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
+const UserModal: React.FC<Props> = ({ isOpen, onClose, user, onSuccess, onError }) => {
   const { divisions, units, updateUser, addUser } = useApp();
   const { user: currentUser, profile, refreshCurrentUser } = useAuth();
 
@@ -49,7 +51,16 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
       .slice(0, 2) || 'U';
   }, [formData.name]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    if (import.meta.env.DEV) {
+      console.log('[UserModal] isOpen=false, not rendering');
+    }
+    return null;
+  }
+
+  if (import.meta.env.DEV) {
+    console.log('[UserModal] isOpen=true, rendering for user:', user ? `edit ${user.id}` : 'create new');
+  }
 
   const getRoleDescription = (role: string) => {
     switch (role) {
@@ -74,7 +85,7 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
         const tryingDivision = (formData.divisionId || '') !== (user.divisionId || '');
         const tryingUnit = (formData.unitId || '') !== (user.unitId || '');
         if (tryingRole || tryingDivision || tryingUnit) {
-          alert('Permission denied: Only super administrators can change role, division, or unit.');
+          onError?.('Permission denied: Only super administrators can change role, division, or unit.');
           return false;
         }
       }
@@ -112,23 +123,29 @@ const UserModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
           await refreshCurrentUser();
         }
 
+        if (import.meta.env.DEV) {
+          console.log('[UserModal] User updated successfully, closing modal');
+        }
+        onSuccess?.('User updated successfully');
         onClose();
       } catch (error: any) {
         // server will still enforce RLS; show friendly message
-        if (error.message?.includes('Only super administrators')) {
-          alert('Permission denied: Only super administrators can change division or unit assignments.');
-        } else {
-          alert(`Error updating user: ${error.message}`);
-        }
+        const errorMessage = error.message?.includes('Only super administrators') 
+          ? 'Permission denied: Only super administrators can change division or unit assignments.'
+          : `Error updating user: ${error.message}`;
+        onError?.(errorMessage);
       }
     } else {
       try {
         // create (invite-by-email flow handled in AppContext.addUser)
         await addUser(userData);
-        alert('User invited. They will receive an email to set their password.');
+        onSuccess?.('User invited successfully. They will receive an email to set their password.');
+        if (import.meta.env.DEV) {
+          console.log('[UserModal] User created successfully, closing modal');
+        }
         onClose();
       } catch (error: any) {
-        alert(`Error creating user: ${error.message}`);
+        onError?.(`Error creating user: ${error.message}`);
       }
     }
   };
