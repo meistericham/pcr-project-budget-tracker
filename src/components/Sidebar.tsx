@@ -119,7 +119,8 @@ const Sidebar = () => {
               <div>
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white">PCR Tracker</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Project & Budget Management</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">v0.9.03</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">v{__APP_VERSION__}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Built on {__APP_BUILD_DATE__}</p>
               </div>
             )}
           </div>
