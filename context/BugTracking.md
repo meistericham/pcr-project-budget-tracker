@@ -1,5 +1,79 @@
 # Bug / Issue Log
 
+## Bug Fix: /admin/users Page Button Functionality (2024-12-19)
+- **Title**: Fix /admin/users page so all action buttons reliably open dialogs and perform actions
+- **Summary**: 
+  - Fixed missing "Assign Now" and "Edit user" buttons on /admin/users page
+  - Resolved button click issues that prevented dialogs from opening
+  - Hardened Super-Admin gating to be more robust and avoid race conditions
+  - Added proper z-index management to prevent overlay issues
+  - Integrated UserModal for user editing and assignment functionality
+
+- **Problem Summary**: 
+  - /admin/users page was missing "Assign Now" and "Edit user" buttons
+  - Existing buttons had click issues preventing dialogs from opening
+  - Super-Admin gating had race conditions and used wrong table ('profiles' instead of 'users')
+  - Missing modal integration for user management actions
+  - Potential z-index issues causing overlay problems
+
+- **Root Cause**: 
+  - Incomplete implementation of UsersAdmin.tsx - only had password reset functionality
+  - useIsSuperAdmin hook reading from 'profiles' table instead of 'users' table
+  - Missing UserModal integration for user editing and assignment
+  - Race conditions in auth state checking
+  - No proper z-index management for table and modal layers
+
+- **Changes Made**:
+  - File: `src/lib/authz.ts` — hardened useIsSuperAdmin hook
+    - Added JWT metadata fallback for faster role checking
+    - Changed from 'profiles' to 'users' table for role lookup
+    - Added proper race condition handling with alive flag
+    - Improved error handling and logging
+  - File: `src/pages/UsersAdmin.tsx` — complete functionality restoration
+    - Added "Assign Now" button for division/unit assignment
+    - Added "Edit User" button for user details modification
+    - Integrated UserModal component for user editing
+    - Added proper click handlers with e.stopPropagation()
+    - Added debug logging for all button clicks
+    - Fixed z-index management with relative z-10 for table
+    - Added debug sentinel for role checking
+    - Enhanced info box with all available actions
+  - File: `src/components/UserModal.tsx` — verified integration
+    - Confirmed proper onClose() callback handling
+    - Verified division/unit assignment functionality
+    - Confirmed role-based permission enforcement
+
+- **Bugs found & fixed**:
+  - ✅ Missing "Assign Now" and "Edit user" buttons (implemented)
+  - ✅ Button click handlers not working (added e.stopPropagation() and proper handlers)
+  - ✅ Super-Admin gating race conditions (hardened with proper state management)
+  - ✅ Wrong table reference in authz (changed from 'profiles' to 'users')
+  - ✅ Missing UserModal integration (integrated with proper state management)
+  - ✅ Potential z-index overlay issues (added relative z-10 for table)
+
+- **Verification steps**:
+  1. Super Admin visits /admin/users → page loads with all 4 action buttons
+  2. Click "Assign Now" → UserModal opens for division/unit assignment
+  3. Click "Edit User" → UserModal opens for user editing
+  4. Click "Send Reset Email" → toast shows success, email sent
+  5. Click "Force Reset (fallback)" → confirm dialog appears
+  6. Non-Super Admin visits → redirected with proper 403 page
+  7. Console shows CLICK:<action> debug logs for all buttons
+  8. #__APP_ROLE_CHECK__ shows correct role (true:super_admin)
+  9. All modals open and close properly
+  10. Build and TypeScript check pass
+
+- **Technical Implementation Details**:
+  - Added proper z-index management: table at z-10, modals at z-50
+  - Integrated UserModal with proper open/close state management
+  - Added e.stopPropagation() to prevent click event bubbling
+  - Enhanced useIsSuperAdmin with JWT fallback and proper cleanup
+  - Added comprehensive debug logging for troubleshooting
+  - Maintained existing visual design while restoring functionality
+
+- **Date**: 2024-12-19
+- **Commit**: fix(admin/users): restore missing Assign Now/Edit User buttons, harden Super-Admin gating, fix z-index issues
+
 ## Enhancement: Super Admin Password Management Implementation (2024-12-19)
 - **Title**: Implement Password Management on /admin/users (Super Admin only)
 - **Summary**: 

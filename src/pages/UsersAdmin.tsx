@@ -1,27 +1,33 @@
 // src/pages/UsersAdmin.tsx
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Home, Mail, AlertTriangle, RefreshCw, Shield } from 'lucide-react';
+import { ArrowLeft, Home, Mail, AlertTriangle, RefreshCw, Shield, Edit, UserPlus, Users } from 'lucide-react';
 
 import { useIsSuperAdmin } from '../lib/authz';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import UserModal from '../components/UserModal';
+import type { User } from '../types';
 
 export default function UsersAdmin() {
   // 1) Gate the page: only Super Admins
   const { allowed, error, role } = useIsSuperAdmin();
 
   // 2) Data & actions
-  const { users } = useApp();                       // list of users (already coming from DB)
-  const { forgotPassword, adminResetPassword } = useAuth(); // password helpers
+  const { users, divisions, units, updateUser, addUser } = useApp();
+  const { forgotPassword, adminResetPassword } = useAuth();
 
   // 3) UI state
   const { toasts, showSuccess, showError, showInfo, removeToast } = useToast();
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [confirmAction, setConfirmAction] = useState<'reset' | 'force' | null>(null);
+  
+  // Modal states
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
 
   // tiny debug (only in dev)
   useEffect(() => {
@@ -65,7 +71,7 @@ export default function UsersAdmin() {
   }
 
   // 5) Actions
-  const handleSendResetEmail = async (user: any) => {
+  const handleSendResetEmail = async (user: User) => {
     try {
       setIsLoading((p) => ({ ...p, [user.id]: true }));
 
@@ -84,7 +90,7 @@ export default function UsersAdmin() {
     }
   };
 
-  const handleForceReset = async (user: any) => {
+  const handleForceReset = async (user: User) => {
     try {
       setIsLoading((p) => ({ ...p, [user.id]: true }));
       const newPassword = prompt(`Enter new password for ${user.email} (min 8 chars)`) || '';
@@ -102,7 +108,7 @@ export default function UsersAdmin() {
     }
   };
 
-  const openConfirmDialog = (user: any, action: 'reset' | 'force') => {
+  const openConfirmDialog = (user: User, action: 'reset' | 'force') => {
     setSelectedUser(user);
     setConfirmAction(action);
     setShowConfirmDialog(true);
@@ -113,9 +119,40 @@ export default function UsersAdmin() {
     confirmAction === 'reset' ? handleSendResetEmail(selectedUser) : handleForceReset(selectedUser);
   };
 
+  const handleEditUser = (user: User) => {
+    console.log('[AdminUsers] CLICK:edit-user', user.id);
+    setEditUser(user);
+    setShowUserModal(true);
+  };
+
+  const handleAssignNow = (user: User) => {
+    console.log('[AdminUsers] CLICK:assign-now', user.id);
+    setEditUser(user);
+    setShowUserModal(true);
+  };
+
+  const handleUserModalClose = () => {
+    setShowUserModal(false);
+    setEditUser(null);
+  };
+
+  const handleUserUpdate = async (updatedUser: User) => {
+    try {
+      await updateUser(updatedUser.id, updatedUser);
+      showSuccess('User Updated', `User ${updatedUser.name} has been updated successfully`);
+      handleUserModalClose();
+    } catch (err: any) {
+      console.error('[AdminUsers] user update error:', err);
+      showError('Update Failed', err.message || 'Failed to update user');
+    }
+  };
+
   // 6) UI
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Debug sentinel for role check */}
+      <span id="__APP_ROLE_CHECK__" className="sr-only">{String(allowed)}:{role || 'unknown'}</span>
+
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((t) => (
@@ -127,7 +164,7 @@ export default function UsersAdmin() {
                   : t.type === 'error'
                   ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
                   : t.type === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
+                  ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-red-800'
                   : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
               }`}
             >
@@ -161,7 +198,7 @@ export default function UsersAdmin() {
               <span className="text-gray-400 dark:text-gray-600">/</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">Admin</span>
               <span className="text-gray-400 dark:text-gray-600">/</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">Password Management</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">User Management</span>
             </div>
 
             <button
@@ -178,11 +215,12 @@ export default function UsersAdmin() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Password Management</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Send password reset links or perform a forced reset.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">User Management</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Manage users, assign divisions/units, and reset passwords.</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        {/* User table with proper z-index */}
+        <div className="relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -195,7 +233,7 @@ export default function UsersAdmin() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {users.map((u: any) => (
+                {users.map((u: User) => (
                   <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -221,21 +259,50 @@ export default function UsersAdmin() {
                         {u.role ? u.role.replace('_', ' ') : 'user'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{u.division_id || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{u.unit_id || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {divisions.find(d => d.id === u.divisionId)?.name || u.divisionId || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {units.find(unit => unit.id === u.unitId)?.name || u.unitId || '-'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
+                        {/* Assign Now Button */}
                         <button
-                          onClick={() => handleSendResetEmail(u)}
+                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:assign-now', u.id); handleAssignNow(u); }}
+                          disabled={isLoading[u.id]}
+                          className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Assign division and unit"
+                        >
+                          <UserPlus className="h-3 w-3" />
+                          <span>Assign Now</span>
+                        </button>
+
+                        {/* Edit User Button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:edit-user', u.id); handleEditUser(u); }}
+                          disabled={isLoading[u.id]}
+                          className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-blue-100 dark:bg-blue-700 border border-blue-300 dark:border-blue-600 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Edit user details"
+                        >
+                          <Edit className="h-3 w-3" />
+                          <span>Edit User</span>
+                        </button>
+
+                        {/* Send Reset Email Button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:send-reset', u.id); handleSendResetEmail(u); }}
                           disabled={isLoading[u.id]}
                           className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Send password reset email"
                         >
                           {isLoading[u.id] ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
                           <span>Send Reset Email</span>
                         </button>
 
+                        {/* Force Reset Button */}
                         <button
-                          onClick={() => openConfirmDialog(u, 'force')}
+                          onClick={(e) => { e.stopPropagation(); console.log('CLICK:force-reset', u.id); openConfirmDialog(u, 'force'); }}
                           disabled={isLoading[u.id]}
                           className="inline-flex items-center space-x-2 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Fallback (admin): set temp password & email user manually"
@@ -252,17 +319,20 @@ export default function UsersAdmin() {
           </div>
         </div>
 
+        {/* Info Box */}
         <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
               <Shield className="h-5 w-5 text-blue-400" />
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Password Reset Process</h3>
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">User Management Process</h3>
               <div className="mt-2 text-sm text-blue-700 dark:text-blue-400">
-                <p>• <strong>Send Reset Email:</strong> user receives an email with a password reset link.</p>
-                <p>• <strong>Force Reset (fallback):</strong> use only if email reset fails.</p>
-                <p>• Users land on <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/update-password</code> to set the new password.</p>
+                <p>• <strong>Assign Now:</strong> assign division and unit to users</p>
+                <p>• <strong>Edit User:</strong> modify user details and permissions</p>
+                <p>• <strong>Send Reset Email:</strong> user receives an email with a password reset link</p>
+                <p>• <strong>Force Reset (fallback):</strong> use only if email reset fails</p>
+                <p>• Users land on <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/update-password</code> to set the new password</p>
               </div>
             </div>
           </div>
@@ -280,6 +350,15 @@ export default function UsersAdmin() {
         cancelText="Cancel"
         variant="warning"
       />
+
+      {/* User Modal */}
+      {showUserModal && editUser && (
+        <UserModal
+          isOpen={showUserModal}
+          onClose={handleUserModalClose}
+          user={editUser}
+        />
+      )}
     </div>
   );
 }

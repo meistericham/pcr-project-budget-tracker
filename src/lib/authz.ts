@@ -8,46 +8,103 @@ export function useIsSuperAdmin(): {
   role?: AppRole;
   error?: string;
 } {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [role, setRole] = useState<AppRole | undefined>();
-  const [error, setError] = useState<string | undefined>();
+  const [state, setState] = useState<{allowed: boolean|null, role?: AppRole, error?: string}>({allowed: null});
 
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
 
-    async function check() {
+    (async () => {
       try {
-        const { data: s } = await supabase.auth.getSession();
-        const uid = s?.session?.user?.id;
-        if (!uid) { setAllowed(null); return; }
+        // Wait for session to be available
+        const { data: { session } } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        
+        if (!uid) { 
+          if (!alive) return;
+          setState({ allowed: null }); 
+          return; 
+        }
 
-        const { data, error: qErr } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', uid)
-          .single();
+        // Try to get role from JWT metadata first (faster)
+        const jwtRole = session?.user?.app_metadata?.role ?? session?.user?.user_metadata?.role ?? null;
+        
+        // Fallback to database query
+        let dbRole = null;
+        if (uid) {
+          const { data, error: qErr } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', uid)
+            .single();
 
-        if (qErr) { if (!cancelled) { setError(qErr.message); setAllowed(null); } return; }
+          if (!qErr && data?.role) {
+            dbRole = data.role;
+          }
+        }
 
-        const r = (data?.role ?? '').trim() as AppRole;
-        if (!cancelled) { setRole(r); setAllowed(r === 'super_admin'); }
+        // Use database role if available, otherwise JWT role, fallback to 'user'
+        const role = (dbRole || jwtRole || 'user') as AppRole;
+        
+        if (!alive) return;
+        setState({ allowed: role === 'super_admin', role });
       } catch (e: any) {
-        if (!cancelled) { setError(e?.message || 'Unknown error'); setAllowed(null); }
+        if (!alive) return;
+        console.error('[useIsSuperAdmin] Error:', e);
+        setState({ allowed: false, role: undefined, error: e?.message ?? 'authz check failed' });
       }
-    }
+    })();
 
-    check();
+    // Listen for auth state changes
     const sub = supabase.auth.onAuthStateChange((evt) => {
       if (evt === 'SIGNED_IN' || evt === 'TOKEN_REFRESHED') {
-        setAllowed(null);
-        check();
+        setState({ allowed: null });
+        // Re-check after auth state change
+        (async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const uid = session?.user?.id;
+            
+            if (!uid) { 
+              if (!alive) return;
+              setState({ allowed: null }); 
+              return; 
+            }
+
+            const jwtRole = session?.user?.app_metadata?.role ?? session?.user?.user_metadata?.role ?? null;
+            let dbRole = null;
+            
+            if (uid) {
+              const { data, error: qErr } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', uid)
+                .single();
+
+              if (!qErr && data?.role) {
+                dbRole = data.role;
+              }
+            }
+
+            const role = (dbRole || jwtRole || 'user') as AppRole;
+            
+            if (!alive) return;
+            setState({ allowed: role === 'super_admin', role });
+          } catch (e: any) {
+            if (!alive) return;
+            console.error('[useIsSuperAdmin] Re-check error:', e);
+            setState({ allowed: false, role: undefined, error: e?.message ?? 'authz re-check failed' });
+          }
+        })();
       }
     });
 
-    return () => { sub.data.subscription.unsubscribe(); cancelled = true; };
+    return () => { 
+      alive = false; 
+      sub.data.subscription.unsubscribe(); 
+    };
   }, []);
 
-  return { allowed, role, error };
+  return state;
 }
 
 
