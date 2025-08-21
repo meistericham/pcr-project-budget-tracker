@@ -15,38 +15,40 @@ export function useIsSuperAdmin(): {
 
     (async () => {
       try {
-        // Wait for session to be available
+        // 1. Get session JWT role as primary source of truth
         const { data: { session } } = await supabase.auth.getSession();
-        const uid = session?.user?.id;
+        const jwtRole = (session?.user?.app_metadata?.role as AppRole) || null;
         
+        // 2. If JWT says super_admin, trust it immediately
+        if (jwtRole === 'super_admin') {
+          if (!alive) return;
+          setState({ allowed: true, role: 'super_admin' });
+          return;
+        }
+
+        // 3. Otherwise, fall back to users table lookup
+        const uid = session?.user?.id;
         if (!uid) { 
           if (!alive) return;
           setState({ allowed: null }); 
           return; 
         }
 
-        // Try to get role from JWT metadata first (faster)
-        const jwtRole = session?.user?.app_metadata?.role ?? session?.user?.user_metadata?.role ?? null;
-        
-        // Fallback to database query
-        let dbRole = null;
-        if (uid) {
-          const { data, error: qErr } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', uid)
-            .single();
+        const { data, error: qErr } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', uid)
+          .single();
 
-          if (!qErr && data?.role) {
-            dbRole = data.role;
-          }
+        if (qErr) { 
+          if (!alive) return;
+          setState({ allowed: false, role: undefined, error: qErr.message }); 
+          return; 
         }
 
-        // Use database role if available, otherwise JWT role, fallback to 'user'
-        const role = (dbRole || jwtRole || 'user') as AppRole;
-        
+        const dbRole = (data?.role ?? '').trim() as AppRole;
         if (!alive) return;
-        setState({ allowed: role === 'super_admin', role });
+        setState({ allowed: dbRole === 'super_admin', role: dbRole });
       } catch (e: any) {
         if (!alive) return;
         console.error('[useIsSuperAdmin] Error:', e);
@@ -62,33 +64,37 @@ export function useIsSuperAdmin(): {
         (async () => {
           try {
             const { data: { session } } = await supabase.auth.getSession();
-            const uid = session?.user?.id;
+            const jwtRole = (session?.user?.app_metadata?.role as AppRole) || null;
             
+            // Trust JWT super_admin immediately
+            if (jwtRole === 'super_admin') {
+              if (!alive) return;
+              setState({ allowed: true, role: 'super_admin' });
+              return;
+            }
+
+            const uid = session?.user?.id;
             if (!uid) { 
               if (!alive) return;
               setState({ allowed: null }); 
               return; 
             }
 
-            const jwtRole = session?.user?.app_metadata?.role ?? session?.user?.user_metadata?.role ?? null;
-            let dbRole = null;
-            
-            if (uid) {
-              const { data, error: qErr } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', uid)
-                .single();
+            const { data, error: qErr } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', uid)
+              .single();
 
-              if (!qErr && data?.role) {
-                dbRole = data.role;
-              }
+            if (qErr) { 
+              if (!alive) return;
+              setState({ allowed: false, role: undefined, error: qErr.message }); 
+              return; 
             }
 
-            const role = (dbRole || jwtRole || 'user') as AppRole;
-            
+            const dbRole = (data?.role ?? '').trim() as AppRole;
             if (!alive) return;
-            setState({ allowed: role === 'super_admin', role });
+            setState({ allowed: dbRole === 'super_admin', role: dbRole });
           } catch (e: any) {
             if (!alive) return;
             console.error('[useIsSuperAdmin] Re-check error:', e);

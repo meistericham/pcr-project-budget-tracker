@@ -1,5 +1,54 @@
 # Bug / Issue Log
 
+## Bug Fix: Super Admin Authorization Check Priority (2024-12-19)
+- **Title**: Fix Super Admin authorization check to prioritize JWT role as source of truth
+- **Summary**: 
+  - Updated useIsSuperAdmin hook to trust JWT role (supabase.auth.getSession) as primary source
+  - Only falls back to users table lookup when JWT role is missing
+  - Improves performance and security by prioritizing JWT claims
+  - Maintains backward compatibility with database fallback
+
+- **Problem Summary**: 
+  - Previous implementation mixed JWT and database role checking without clear priority
+  - Could lead to inconsistent authorization decisions
+  - Database queries were always executed even when JWT had sufficient information
+  - No clear source of truth for role determination
+
+- **Root Cause**: 
+  - useIsSuperAdmin hook was checking both JWT and database without clear priority
+  - Mixed approach could lead to race conditions or inconsistent results
+  - Database fallback was always executed regardless of JWT role validity
+
+- **Changes Made**:
+  - File: `src/lib/authz.ts` — updated useIsSuperAdmin hook
+    - **Primary**: JWT role from `session?.user?.app_metadata?.role` is now source of truth
+    - **Immediate Trust**: If JWT says 'super_admin', return true immediately without database query
+    - **Fallback Only**: Database lookup only happens when JWT role is missing or not 'super_admin'
+    - **Performance**: Eliminates unnecessary database queries for JWT super_admin users
+    - **Security**: JWT claims are trusted as primary authorization source
+
+- **Bugs found & fixed**:
+  - ✅ Inconsistent role checking priority (JWT now primary, database fallback)
+  - ✅ Unnecessary database queries for JWT super_admin users (eliminated)
+  - ✅ Mixed authorization sources without clear hierarchy (clarified)
+
+- **Verification steps**:
+  1. Super Admin with JWT role 'super_admin' → immediate authorization (no DB query)
+  2. User with missing JWT role → falls back to database lookup
+  3. User with JWT role 'admin' → falls back to database lookup
+  4. Auth state changes trigger proper re-checking
+  5. Build and TypeScript check pass
+
+- **Technical Implementation Details**:
+  - JWT role check: `session?.user?.app_metadata?.role`
+  - Immediate return for JWT super_admin: `if (jwtRole === 'super_admin') return true`
+  - Database fallback only when JWT insufficient
+  - Proper cleanup with alive flag to prevent memory leaks
+  - Auth state change listeners for real-time updates
+
+- **Date**: 2024-12-19
+- **Commit**: fix(authz): prioritize JWT role as source of truth, database as fallback only
+
 ## Bug Fix: /admin/users Page Button Functionality (2024-12-19)
 - **Title**: Fix /admin/users page so all action buttons reliably open dialogs and perform actions
 - **Summary**: 
