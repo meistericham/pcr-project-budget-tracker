@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Building2, Users, Save } from 'lucide-react';
+import { X, User, Mail, Building2, Users, Save, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMyProfile, saveMyNameInline } from '../lib/profile';
 
@@ -20,13 +20,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // DEV console logging when modal opens
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[UserProfileModal] open', { profile: profile?.id, role });
+    }
+  }, [profile?.id, role]);
+
   useEffect(() => {
     if (profile) {
       setFormData({
         name: profile.name ?? '',
         email: profile.email ?? '',
-        unit: profile.unit ?? '',
-        division: profile.division ?? ''
+        unit: profile.unit ?? '—',
+        division: profile.division ?? '—'
       });
     }
   }, [profile]);
@@ -37,6 +44,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
     setErrorMsg(null);
 
     try {
+      // DEV console logging for save attempt
+      if (import.meta.env.DEV) {
+        console.log('[UserProfileModal] save: name=', formData.name);
+      }
+
       // Optimistic update
       const previous = profile;
       if (previous) {
@@ -45,12 +57,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
       const updated = await saveMyNameInline(formData.name);
       setProfile(updated);
       setSuccess(true);
+
+      // DEV console logging for successful save
+      if (import.meta.env.DEV) {
+        console.log('[UserProfileModal] saved');
+      }
+
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (error) {
       if (profile) setProfile(profile); // rollback
       setErrorMsg((error as any)?.message || 'Failed to save profile. Please try again.');
+
+      // DEV console logging for failed save
+      if (import.meta.env.DEV) {
+        console.log('[UserProfileModal] failed', error);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -150,38 +173,44 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
 
           {/* Unit */}
           <div>
+            {/* Note: Unit/Division updates are restricted by RLS and are intended to be changed by a Super Admin via User Management */}
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Building2 className="inline h-4 w-4 mr-1" />
               Unit
+              <Lock className="inline h-3 w-3 ml-1 text-gray-400" />
             </label>
             <input
               type="text"
               value={formData.unit}
-              onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Enter your unit (e.g., IT Department, Finance Unit)"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+              placeholder="Unit assignment"
+              disabled
+              readOnly
             />
           </div>
 
           {/* Division */}
           <div>
+            {/* Note: Unit/Division updates are restricted by RLS and are intended to be changed by a Super Admin via User Management */}
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Users className="inline h-4 w-4 mr-1" />
               Division
+              <Lock className="inline h-3 w-3 ml-1 text-gray-400" />
             </label>
             <input
               type="text"
               value={formData.division}
-              onChange={(e) => setFormData(prev => ({ ...prev, division: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Enter your division (e.g., Operations, Marketing)"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+              placeholder="Division assignment"
+              disabled
+              readOnly
             />
           </div>
 
-          {/* Info Note */}
+          {/* Info Note - Updated to show contact information */}
           <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <p className="text-sm text-yellow-800 dark:text-yellow-300">
-              <strong>Note:</strong> Unit and Division information helps with project organization and reporting. This information is optional but recommended.
+              Unit & Division are managed by your organization. For changes, please contact Super Admin (Mohd Hisyamudin).
             </p>
           </div>
 

@@ -1262,3 +1262,56 @@
 ### Technical Details
 - **Function URL**: `https://<project-ref>.functions.supabase.co/admin-reset-password`
 - **Authentication**: Requires `
+
+## Enhancement: Profile modal: lock Unit/Division to admin-only (2024-12-19)
+- **Title**: Profile modal: lock Unit/Division to admin-only
+- **Summary**: 
+  - Updated UserProfileModal to make Unit & Division fields read-only for normal users
+  - Added contact note directing users to Super Admin for changes
+  - Kept Name field fully editable while maintaining existing functionality
+  - Added DEV console logging for debugging and development experience
+
+- **Problem Summary**: 
+  - Unit & Division fields appeared editable in profile modal but didn't persist changes
+  - Users were confused about why their changes weren't saved
+  - No clear indication that these fields are managed by organization
+  - Missing developer logging for troubleshooting profile updates
+
+- **Root Cause**: 
+  - Profile modal allowed editing of Unit/Division fields that are restricted by RLS policies
+  - No visual indication that these fields are read-only for normal users
+  - Missing contact information for users who need changes
+  - Insufficient developer logging for debugging profile operations
+
+- **Changes Made**:
+  - **UI Changes**: Made Unit and Division inputs disabled/readOnly with visual lock icons
+  - **Contact Note**: Updated info block to show "Unit & Division are managed by your organization. For changes, please contact Super Admin (Mohd Hisyamudin)."
+  - **Field Behavior**: Unit and Division now show current values but cannot be edited
+  - **Name Field**: Remains fully editable with existing saveMyNameInline functionality
+  - **Developer Experience**: Added comprehensive DEV console logging for modal open, save attempts, and results
+  - **RLS Documentation**: Added code comments referencing RLS restrictions and Super Admin management
+
+- **Target Behavior**:
+  - **Normal Users**: Can edit Name only; Unit/Division show current values but are disabled
+  - **Super Admins**: Can still change user Division/Unit from User Management interface
+  - **Visual Feedback**: Lock icons and disabled styling clearly indicate read-only fields
+  - **Contact Information**: Clear note about who to contact for changes
+  - **Developer Logging**: Console shows modal operations for debugging
+
+- **Status**: ✅ COMPLETED - All functionality implemented and tested
+- **Priority**: P2 - Improves user experience and reduces confusion
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Files Changed**:
+  - `src/components/UserProfileModal.tsx` - Made Unit/Division read-only, added contact note, enhanced DEV logging
+  - `context/BugTracking.md` - Added enhancement entry with details
+  - `context/VerificationNotes.md` - Added testing checklist
+
+- **Verification Steps**:
+  1. **As normal user**: Open profile modal → Name editable, Unit/Division disabled with lock icons
+  2. **Contact note**: Shows "contact Super Admin (Mohd Hisyamudin)" message
+  3. **Name editing**: Change name → save → success animation → modal closes
+  4. **DEV logging**: Console shows [UserProfileModal] open, save, saved/failed messages
+  5. **As Super Admin**: Confirm can still change user Division/Unit from User Management
+  6. **Build verification**: npm run build passes without TypeScript errors

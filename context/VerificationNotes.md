@@ -235,3 +235,54 @@ Check Network tab for successful admin-create-user response:
 - ✅ Edit button states reflect actual permissions
 - ✅ canEditProject helper used consistently
 - ✅ No direct client calls to admin endpoints for temp password path
+
+## Profile Modal Unit/Division Lock Testing
+
+### 1. Test Normal User Profile Access
+1. **Login as regular user** (not super_admin or admin)
+2. **Click avatar in top-right** → UserProfileModal opens
+3. **Verify field states**:
+   - Full Name: editable input field
+   - Email: disabled input with note "Email cannot be changed"
+   - Unit: disabled input with lock icon, shows current value or "—"
+   - Division: disabled input with lock icon, shows current value or "—"
+4. **Check contact note**: Should show "Unit & Division are managed by your organization. For changes, please contact Super Admin (Mohd Hisyamudin)."
+5. **Verify DEV logging**: Console shows `[UserProfileModal] open`
+
+### 2. Test Name Editing Functionality
+1. **Change Full Name** to a new value
+2. **Click "Save Profile"** → should show loading state
+3. **Verify success**: Success animation appears, then modal closes
+4. **Check DEV logging**: Console shows `[UserProfileModal] save: name=<new-name>` then `[UserProfileModal] saved`
+5. **Refresh page** → new name should persist
+6. **Re-login** → new name should still be there
+
+### 3. Test Unit/Division Read-Only Behavior
+1. **Try to click Unit field** → should not be focusable
+2. **Try to click Division field** → should not be focusable
+3. **Verify styling**: Fields have gray background and cursor-not-allowed
+4. **Check lock icons**: Small lock icons appear next to Unit and Division labels
+5. **Attempt to type**: No input should be possible
+
+### 4. Test Super Admin User Management (Separate Test)
+1. **Login as super_admin**
+2. **Navigate to User Management** (Users table view)
+3. **Find a user and click "Edit User"** → UserModal opens
+4. **Verify Division/Unit fields are editable** in UserModal
+5. **Change Division/Unit assignments** → should save successfully
+6. **Return to profile modal** → should show updated Division/Unit values
+
+### Expected Results
+- ✅ Normal users can edit Name only
+- ✅ Unit and Division fields are visibly disabled with lock icons
+- ✅ Contact note clearly shows who to contact for changes
+- ✅ Name changes persist after refresh and re-login
+- ✅ DEV console shows comprehensive logging
+- ✅ Super Admin can still manage Division/Unit from User Management
+- ✅ No TypeScript errors, build passes successfully
+
+### Troubleshooting
+- If Unit/Division show "—": User may not have assignments yet
+- If lock icons don't appear: Check if lucide-react Lock icon is imported
+- If DEV logging doesn't work: Ensure NODE_ENV=development or import.meta.env.DEV is true
+- If build fails: Check TypeScript compilation for any remaining errors
