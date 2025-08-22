@@ -155,18 +155,22 @@ serve(async (req) => {
     // Create profile row in public.users table
     console.log(`[${requestId}] Creating profile row`)
     
+    const profileData = {
+      id: userId,
+      name,
+      email: email.trim().toLowerCase(),
+      role,
+      initials,
+      division_id: divisionId || null,
+      unit_id: unitId || null,
+      created_at: new Date().toISOString()
+    };
+    
+    console.log(`[${requestId}] Profile data:`, profileData)
+    
     const { error: profileError } = await admin
       .from('users')
-      .upsert({
-        id: userId,
-        name,
-        email: email.trim().toLowerCase(),
-        role,
-        initials,
-        division_id: divisionId || null,
-        unit_id: unitId || null,
-        created_at: new Date().toISOString()
-      }, { onConflict: 'id' })
+      .upsert(profileData, { onConflict: 'id' })
 
     if (profileError) {
       console.error(`[${requestId}] Error creating profile:`, profileError)

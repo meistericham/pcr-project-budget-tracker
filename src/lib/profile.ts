@@ -69,11 +69,30 @@ export const upsertMyProfile = async (patch: Partial<AppProfile>): Promise<AppPr
   const uid = ures?.user?.id;
   if (!uid) return null;
   const payload = { id: uid, ...patch } as Partial<AppProfile> & { id: string };
+  
+  if (import.meta.env.DEV) {
+    console.warn('[USERS:WRITE] about to write', {
+      src: 'profile:upsertMyProfile',
+      payload,
+      where: { id: uid },
+      stack: new Error().stack?.split('\n').slice(0,3)
+    });
+  }
+  
   const { data, error } = await supabase
     .from('users')
     .upsert(payload, { onConflict: 'id' })
     .select('id,email,name,initials,division_id,unit_id,role')
     .single();
+    
+  if (import.meta.env.DEV) {
+    console.warn('[USERS:WRITE:RESULT]', {
+      src: 'profile:upsertMyProfile',
+      error,
+      row: data
+    });
+  }
+  
   if (error) throw new Error(error.message);
   return data as AppProfile;
 };
@@ -100,7 +119,13 @@ export function useMyProfile() {
         .eq('id', uid)
         .single();
       if (error) setError(error.message || `Profile load failed (${status})`);
-      else setProfile(data as AppProfile);
+      else {
+        setProfile(data as AppProfile);
+        if (import.meta.env.DEV) { 
+          window.__LAST_PROFILE = data as AppProfile; 
+          console.log('[PROFILE:SET]', data as AppProfile); 
+        }
+      }
     } catch (e: any) {
       setError(e?.message || 'Unknown error');
     } finally {
@@ -146,12 +171,31 @@ export async function saveMyNameInline(newName: string): Promise<AppProfile> {
       .join('')
       .slice(0, 2) || null;
 
+  const updatePayload = { name: newName, initials };
+  
+  if (import.meta.env.DEV) {
+    console.warn('[USERS:WRITE] about to write', {
+      src: 'profile:saveMyNameInline',
+      payload: updatePayload,
+      where: { id: uid },
+      stack: new Error().stack?.split('\n').slice(0,3)
+    });
+  }
+
   const { data, error } = await supabase
     .from('users')
-    .update({ name: newName, initials }) // ← update both
+    .update(updatePayload) // ← update both
     .eq('id', uid)
     .select('id,email,name,initials,division_id,unit_id,role')
     .single();
+
+  if (import.meta.env.DEV) {
+    console.warn('[USERS:WRITE:RESULT]', {
+      src: 'profile:saveMyNameInline',
+      error,
+      row: data
+    });
+  }
 
   if (error) throw new Error(error.message);
   const updated = data as AppProfile;

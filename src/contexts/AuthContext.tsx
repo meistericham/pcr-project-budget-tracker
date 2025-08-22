@@ -177,9 +177,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           created_at: new Date().toISOString()
         };
 
+        if (import.meta.env.DEV) {
+          console.warn('[USERS:WRITE] about to write', {
+            src: 'AuthContext:syncProfile',
+            payload: newUserData,
+            where: { id: u.id },
+            stack: new Error().stack?.split('\n').slice(0,3)
+          });
+        }
+
         const { error: insertError } = await supabase
           .from('users')
           .insert(newUserData);
+
+        if (import.meta.env.DEV) {
+          console.warn('[USERS:WRITE:RESULT]', {
+            src: 'AuthContext:syncProfile',
+            error: insertError,
+            row: null
+          });
+        }
 
         if (insertError) {
           console.error('[AUTH] Failed to create user profile:', insertError);
@@ -219,10 +236,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Only update if we have changes to make
         if (Object.keys(patch).length > 0) {
+          if (import.meta.env.DEV) {
+            console.warn('[USERS:WRITE] about to write', {
+              src: 'AuthContext:syncProfile',
+              payload: patch,
+              where: { id: u.id },
+              stack: new Error().stack?.split('\n').slice(0,3)
+            });
+          }
+
           const { error: updateError } = await supabase
             .from('users')
             .update(patch)
             .eq('id', u.id);
+
+          if (import.meta.env.DEV) {
+            console.warn('[USERS:WRITE:RESULT]', {
+              src: 'AuthContext:syncProfile',
+              error: updateError,
+              row: null
+            });
+          }
 
           if (updateError) {
             console.error('[AUTH] Failed to update user profile:', updateError);
@@ -279,6 +313,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRole((data.role as Role) ?? null);
       
       if (import.meta.env.DEV) {
+        window.__LAST_PROFILE = freshProfile;
+        console.log('[PROFILE:SET]', freshProfile);
         console.debug('[AUTH] Current user refreshed:', freshProfile);
       }
     } catch (err) {
@@ -326,7 +362,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfileName = async (newName: string) => {
     setError(null);
     if (!user?.id) return;
+    
+    if (import.meta.env.DEV) {
+      console.warn('[USERS:WRITE] about to write', {
+        src: 'AuthContext:updateProfileName',
+        payload: { name: newName },
+        where: { id: user.id },
+        stack: new Error().stack?.split('\n').slice(0,3)
+      });
+    }
+    
     const { error } = await supabase.from('users').update({ name: newName }).eq('id', user.id);
+    
+    if (import.meta.env.DEV) {
+      console.warn('[USERS:WRITE:RESULT]', {
+        src: 'AuthContext:updateProfileName',
+        error,
+        row: null
+      });
+    }
+    
     if (error) throw new Error(error.message);
     // optional: refetch role or user profile if you show it
   };

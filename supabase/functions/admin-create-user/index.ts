@@ -90,18 +90,22 @@ serve(async (req) => {
     // Now upsert the app profile
     console.log(`[${requestId}] Upserting app profile`)
     
+    const profileData = {
+      id: userId,
+      name,
+      email: email.trim().toLowerCase(),
+      role,
+      initials: initials || name.split(' ').map(n => n[0]).join('').toUpperCase(),
+      division_id: divisionId || null,
+      unit_id: unitId || null,
+      created_at: new Date().toISOString()
+    };
+    
+    console.log(`[${requestId}] Profile data:`, profileData)
+    
     const { error: profileError } = await admin
       .from('users')
-      .upsert({
-        id: userId,
-        name,
-        email: email.trim().toLowerCase(),
-        role,
-        initials: initials || name.split(' ').map(n => n[0]).join('').toUpperCase(),
-        division_id: divisionId || null,
-        unit_id: unitId || null,
-        created_at: new Date().toISOString()
-      }, { onConflict: 'id' })
+      .upsert(profileData, { onConflict: 'id' })
 
     if (profileError) {
       console.error(`[${requestId}] Error upserting profile:`, profileError)

@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
       unit_id: null
     }
 
+    console.log(`[${requestId}] Upserting new profile:`, profile)
+    
     const { data: upserted, error: upErr } = await adminClient
       .from('users')
       .upsert(profile, { onConflict: 'id' })
@@ -94,8 +96,11 @@ Deno.serve(async (req) => {
       .single()
 
     if (upErr) {
+      console.error(`[${requestId}] Profile upsert failed:`, upErr)
       return json({ error: upErr.message }, { status: 500 })
     }
+
+    console.log(`[${requestId}] Profile upserted successfully:`, upserted)
 
     return json({ ok: true, profile: upserted }, { status: 200 })
   } catch (e) {

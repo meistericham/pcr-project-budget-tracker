@@ -1,5 +1,38 @@
 # Bug / Issue Log
 
+## Investigating: users.name revert to email-localpart after hard refresh (2024-12-19)
+- **Title**: users.name revert to email-localpart after hard refresh
+- **Summary**: 
+  - Investigating bug where `public.users.name` reverts to email-localpart after hard refresh
+  - Added comprehensive DEV breadcrumb logging to all users table write operations
+  - Added global profile tracking to monitor when profiles are loaded in memory
+
+- **Symptom**: 
+  - User changes their name in profile modal
+  - Name appears to save successfully
+  - After hard refresh (F5), name reverts to email-localpart (e.g., "mohd" from "mohd@example.com")
+
+- **What We Suspect**: 
+  - One of the write paths is overwriting the name with email-localpart
+  - Possible culprit: AuthContext syncProfile function that derives name from email
+  - Edge functions or other services might be resetting name on auth state changes
+
+- **What Logs Were Added**: 
+  - `[USERS:WRITE]` before each users table write operation
+  - `[USERS:WRITE:RESULT]` after each write operation
+  - `[PROFILE:SET]` when profile is loaded in memory
+  - Global `window.__LAST_PROFILE` tracking for debugging
+
+- **Where to Look Next**: 
+  - Check console logs during name change and refresh
+  - Look for any writes that include name field with email-localpart value
+  - Verify ensure-profile edge function is truly read-only for existing rows
+  - Check if any auth state changes trigger unwanted profile updates
+
+- **Status**: 🔍 INVESTIGATING - Added comprehensive logging
+- **Priority**: P2 - User experience issue
+- **Date**: 2024-12-19
+
 ## Bug Fix: users.updated_at select fix (2024-12-19)
 - **Title**: Remove updated_at from users table selects
 - **Summary**: 

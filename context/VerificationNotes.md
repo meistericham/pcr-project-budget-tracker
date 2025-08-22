@@ -1,5 +1,18 @@
 # Verification Notes
 
+## Users.name Revert Bug Investigation Checklist
+
+### How to Reproduce
+1. **Change name in profile modal** → save successfully
+2. **Hard refresh page** (F5) → name reverts to email-localpart
+3. **Check console logs** for `[USERS:WRITE]` and `[PROFILE:SET]` messages
+
+### What to Copy from Console
+1. **Before refresh**: Look for `[USERS:WRITE]` logs showing name update
+2. **After refresh**: Look for `[PROFILE:SET]` logs showing loaded profile
+3. **Check `window.__LAST_PROFILE`**: Shows last profile loaded in memory
+4. **Look for unwanted writes**: Any `[USERS:WRITE]` that includes name field
+
 ## Project Editing Permissions Testing
 
 ### 1. Test Admin Editing Someone Else's Project

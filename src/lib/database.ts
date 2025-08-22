@@ -157,12 +157,21 @@ export const userService = {
   
       console.log('[userService.update] id →', id);
       console.log('[userService.update] patch →', patch);
-  
+
       // No-op guard
       if (Object.keys(patch).length === 0) {
         const { data, error } = await supabase.from('users').select('id,email,name,initials,role,division_id,unit_id').eq('id', id).single();
         if (error) throw error;
         return transformUser(data);
+      }
+
+      if (import.meta.env.DEV) {
+        console.warn('[USERS:WRITE] about to write', {
+          src: 'database:userService.update',
+          payload: patch,
+          where: { id },
+          stack: new Error().stack?.split('\n').slice(0,3)
+        });
       }
 
       const { data, error, status } = await supabase
@@ -171,6 +180,14 @@ export const userService = {
         .eq('id', id)
         .select('id,email,name,initials,role,division_id,unit_id')
         .single();
+
+      if (import.meta.env.DEV) {
+        console.warn('[USERS:WRITE:RESULT]', {
+          src: 'database:userService.update',
+          error,
+          row: data
+        });
+      }
 
       if (error) {
         if (error.message?.includes('Only super administrators')) {
