@@ -6,8 +6,8 @@ export type AppProfile = {
   name: string | null;
   role: 'super_admin' | 'admin' | 'user';
   initials: string | null;
-  unit?: string | null;
-  division?: string | null;
+  division_id?: string | null;
+  unit_id?: string | null;
 };
 
 type GetProfileResult = {
@@ -24,8 +24,8 @@ export const getMyProfile = async (): Promise<GetProfileResult> => {
 
     if (import.meta.env.DEV) console.debug('[AUTH] user loaded', uid);
     const { data, error, status } = await supabase
-      .from('profiles')
-      .select('id,email,name,initials,unit,division,role')
+      .from('users')
+      .select('id,email,name,initials,division_id,unit_id,role')
       .eq('id', uid)
       .single();
 
@@ -70,9 +70,9 @@ export const upsertMyProfile = async (patch: Partial<AppProfile>): Promise<AppPr
   if (!uid) return null;
   const payload = { id: uid, ...patch } as Partial<AppProfile> & { id: string };
   const { data, error } = await supabase
-    .from('profiles')
+    .from('users')
     .upsert(payload, { onConflict: 'id' })
-    .select('id,email,name,initials,unit,division,role')
+    .select('id,email,name,initials,division_id,unit_id,role')
     .single();
   if (error) throw new Error(error.message);
   return data as AppProfile;
@@ -95,8 +95,8 @@ export function useMyProfile() {
       const uid = ures?.user?.id;
       if (!uid) { setProfile(null); setLoading(false); return; }
       const { data, error, status } = await supabase
-        .from('profiles')
-        .select('id,email,name,initials,unit,division,role')
+        .from('users')
+        .select('id,email,name,initials,division_id,unit_id,role')
         .eq('id', uid)
         .single();
       if (error) setError(error.message || `Profile load failed (${status})`);
@@ -138,10 +138,10 @@ export async function saveMyNameInline(newName: string): Promise<AppProfile> {
   if (!uid) throw new Error('Not signed in');
 
   const { data, error } = await supabase
-    .from('profiles')
+    .from('users')
     .update({ name: newName })
     .eq('id', uid)
-    .select('id,email,name,initials,unit,division,role')
+    .select('id,email,name,initials,division_id,unit_id,role')
     .single();
 
   if (error) throw new Error(error.message);

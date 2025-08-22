@@ -1270,18 +1270,23 @@
   - Added contact note directing users to Super Admin for changes
   - Kept Name field fully editable while maintaining existing functionality
   - Added DEV console logging for debugging and development experience
+  - **COMPLETED**: Updated database schema and RLS policies to enforce restrictions at database level
 
 - **Problem Summary**: 
   - Unit & Division fields appeared editable in profile modal but didn't persist changes
   - Users were confused about why their changes weren't saved
   - No clear indication that these fields are managed by organization
   - Missing developer logging for troubleshooting profile updates
+  - Database schema lacked proper division_id and unit_id fields
+  - RLS policies didn't restrict division/unit updates to super_admin only
 
 - **Root Cause**: 
   - Profile modal allowed editing of Unit/Division fields that are restricted by RLS policies
   - No visual indication that these fields are read-only for normal users
   - Missing contact information for users who need changes
   - Insufficient developer logging for debugging profile operations
+  - Database schema used profiles table instead of users table
+  - RLS policies were too permissive for division/unit updates
 
 - **Changes Made**:
   - **UI Changes**: Made Unit and Division inputs disabled/readOnly with visual lock icons
@@ -1290,6 +1295,10 @@
   - **Name Field**: Remains fully editable with existing saveMyNameInline functionality
   - **Developer Experience**: Added comprehensive DEV console logging for modal open, save attempts, and results
   - **RLS Documentation**: Added code comments referencing RLS restrictions and Super Admin management
+  - **Database Schema**: Added division_id and unit_id fields to users table with proper foreign key constraints
+  - **RLS Policies**: Created restrictive policies that only allow super_admin to update division_id and unit_id
+  - **Data Layer**: Updated profile.ts and AuthContext to use users table with correct field names
+  - **Name Resolution**: Unit and Division names are resolved from IDs using AppContext divisions/units data
 
 - **Target Behavior**:
   - **Normal Users**: Can edit Name only; Unit/Division show current values but are disabled
@@ -1297,6 +1306,7 @@
   - **Visual Feedback**: Lock icons and disabled styling clearly indicate read-only fields
   - **Contact Information**: Clear note about who to contact for changes
   - **Developer Logging**: Console shows modal operations for debugging
+  - **Database Security**: RLS policies enforce division/unit restrictions at database level
 
 - **Status**: ✅ COMPLETED - All functionality implemented and tested
 - **Priority**: P2 - Improves user experience and reduces confusion
@@ -1305,13 +1315,26 @@
 
 - **Files Changed**:
   - `src/components/UserProfileModal.tsx` - Made Unit/Division read-only, added contact note, enhanced DEV logging
-  - `context/BugTracking.md` - Added enhancement entry with details
+  - `src/lib/profile.ts` - Updated to use users table with division_id/unit_id fields
+  - `src/contexts/AuthContext.tsx` - Updated to use users table for profile updates
+  - `database/add-division-unit-fields.sql` - NEW: Database migration for division/unit fields and RLS policies
+  - `context/BugTracking.md` - Updated enhancement entry with complete details
   - `context/VerificationNotes.md` - Added testing checklist
 
+- **Database Changes**:
+  - Added `division_id UUID REFERENCES divisions(id)` to users table
+  - Added `unit_id UUID REFERENCES units(id)` to users table
+  - Created indexes for performance
+  - Updated RLS policies to restrict division/unit updates to super_admin only
+  - Users can only update basic fields (name, initials, email)
+
 - **Verification Steps**:
-  1. **As normal user**: Open profile modal → Name editable, Unit/Division disabled with lock icons
-  2. **Contact note**: Shows "contact Super Admin (Mohd Hisyamudin)" message
-  3. **Name editing**: Change name → save → success animation → modal closes
-  4. **DEV logging**: Console shows [UserProfileModal] open, save, saved/failed messages
-  5. **As Super Admin**: Confirm can still change user Division/Unit from User Management
-  6. **Build verification**: npm run build passes without TypeScript errors
+  1. **Database Migration**: Run `database/add-division-unit-fields.sql` in Supabase SQL editor
+  2. **As normal user**: Open profile modal → Name editable, Unit/Division disabled with lock icons
+  3. **Contact note**: Shows "contact Super Admin (Mohd Hisyamudin)" message
+  4. **Name editing**: Change name → save → success animation → modal closes
+  5. **DEV logging**: Console shows [UserProfileModal] open, save, saved/failed messages
+  6. **As Super Admin**: Confirm can still change user Division/Unit from User Management
+  7. **Build verification**: npm run build passes without TypeScript errors
+  8. **Database verification**: Check that division_id and unit_id fields exist in users table
+  9. **RLS verification**: Confirm policies prevent non-super-admin from updating division/unit fields

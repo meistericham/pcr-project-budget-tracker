@@ -238,6 +238,14 @@ Check Network tab for successful admin-create-user response:
 
 ## Profile Modal Unit/Division Lock Testing
 
+### 0. Database Migration (Required First)
+1. **Run Database Migration**: Execute `database/add-division-unit-fields.sql` in Supabase SQL editor
+2. **Verify Schema Changes**: Check that users table now has `division_id` and `unit_id` columns
+3. **Verify RLS Policies**: Confirm new policies are created:
+   - `users_update_own_row` - restricts users to basic field updates only
+   - `users_super_admin_update_division_unit` - allows super_admin to update any field
+   - `users_super_admin_manage_all` - allows super_admin full access
+
 ### 1. Test Normal User Profile Access
 1. **Login as regular user** (not super_admin or admin)
 2. **Click avatar in top-right** → UserProfileModal opens
@@ -272,7 +280,15 @@ Check Network tab for successful admin-create-user response:
 5. **Change Division/Unit assignments** → should save successfully
 6. **Return to profile modal** → should show updated Division/Unit values
 
+### 5. Test RLS Policy Enforcement
+1. **As non-super-admin user**: Try to update division_id/unit_id via direct API call
+2. **Verify rejection**: Should get permission denied error
+3. **As super_admin**: Update division_id/unit_id via UserModal
+4. **Verify success**: Changes should persist in database
+
 ### Expected Results
+- ✅ Database migration adds division_id and unit_id fields to users table
+- ✅ RLS policies prevent non-super-admin from updating division/unit fields
 - ✅ Normal users can edit Name only
 - ✅ Unit and Division fields are visibly disabled with lock icons
 - ✅ Contact note clearly shows who to contact for changes
@@ -282,7 +298,9 @@ Check Network tab for successful admin-create-user response:
 - ✅ No TypeScript errors, build passes successfully
 
 ### Troubleshooting
-- If Unit/Division show "—": User may not have assignments yet
-- If lock icons don't appear: Check if lucide-react Lock icon is imported
-- If DEV logging doesn't work: Ensure NODE_ENV=development or import.meta.env.DEV is true
-- If build fails: Check TypeScript compilation for any remaining errors
+- **If migration fails**: Check that divisions and units tables exist
+- **If Unit/Division show "—"**: User may not have assignments yet
+- **If lock icons don't appear**: Check if lucide-react Lock icon is imported
+- **If DEV logging doesn't work**: Ensure NODE_ENV=development or import.meta.env.DEV is true
+- **If build fails**: Check TypeScript compilation for any remaining errors
+- **If RLS policies don't work**: Verify policies are created and RLS is enabled on users table

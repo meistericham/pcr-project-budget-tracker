@@ -326,7 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfileName = async (newName: string) => {
     setError(null);
     if (!user?.id) return;
-    const { error } = await supabase.from('profiles').update({ name: newName }).eq('id', user.id);
+    const { error } = await supabase.from('users').update({ name: newName }).eq('id', user.id);
     if (error) throw new Error(error.message);
     // optional: refetch role or user profile if you show it
   };

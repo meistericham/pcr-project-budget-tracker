@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Building2, Users, Save, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMyProfile, saveMyNameInline } from '../lib/profile';
+import { useApp } from '../contexts/AppContext';
 
 interface UserProfileModalProps {
   onClose: () => void;
@@ -10,6 +11,7 @@ interface UserProfileModalProps {
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
   const { role, loading: isLoading } = useAuth();
   const { profile, setProfile } = useMyProfile();
+  const { divisions, units } = useApp();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,14 +31,22 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
 
   useEffect(() => {
     if (profile) {
+      // Resolve division and unit names from IDs
+      const divisionName = profile.division_id ? 
+        divisions.find(d => d.id === profile.division_id)?.name || '—' : 
+        '—';
+      const unitName = profile.unit_id ? 
+        units.find(u => u.id === profile.unit_id)?.name || '—' : 
+        '—';
+
       setFormData({
         name: profile.name ?? '',
         email: profile.email ?? '',
-        unit: profile.unit ?? '—',
-        division: profile.division ?? '—'
+        unit: unitName,
+        division: divisionName
       });
     }
-  }, [profile]);
+  }, [profile, divisions, units]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
