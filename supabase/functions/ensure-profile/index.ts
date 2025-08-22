@@ -82,7 +82,9 @@ Deno.serve(async (req) => {
       email,
       name: nameFromEmail || email,
       role,
-      initials
+      initials,
+      division_id: null,
+      unit_id: null
     }
 
     const { data: upserted, error: upErr } = await adminClient
