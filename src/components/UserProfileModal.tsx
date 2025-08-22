@@ -50,6 +50,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 🚨 prevent double-clicks / races
+    if (isSaving) return;
+
     setIsSaving(true);
     setErrorMsg(null);
 
