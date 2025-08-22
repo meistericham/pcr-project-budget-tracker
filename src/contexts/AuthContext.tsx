@@ -209,15 +209,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // User exists - only update fields that are explicitly available and safe
         const patch: any = {};
-        
-        // Only update name if we have a better one (not empty)
-        if (name && name.trim() && name !== existingRow.name) {
-          patch.name = name;
+
+        /**
+        * IMPORTANT:
+        * Do NOT overwrite a user's chosen name/initials from auth metadata.
+        * Only set them if the DB has no value yet.
+        * This prevents "reverting to email-localpart" after refresh/login.
+        */     
+
+        // name: only write if DB has no name yet
+        if ((!existingRow.name || !existingRow.name.trim()) && name && name.trim()) {
+          patch.name = name.trim();
+        } 
+
+        // initials: only write if DB has no initials yet
+        if ((!existingRow.initials || !existingRow.initials.trim()) && initials && initials.trim()) {
+          patch.initials = initials.trim();
         }
-        
-        // Only update initials if we have better ones
-        if (initials && initials !== existingRow.initials) {
-          patch.initials = initials;
+
+        /**
+        * Role can still be promoted (e.g., user -> admin/super_admin),
+        * but never demoted here.
+        */
+        if (role && role !== existingRow.role) {
+          const roleHierarchy = { 'user': 1, 'admin': 2, 'super_admin': 3 };
+          const currentLevel = roleHierarchy[existingRow.role as keyof typeof roleHierarchy] || 0;
+          const newLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
+          
+          if (newLevel > currentLevel) {
+            patch.role = role;
+            if (import.meta.env.DEV) {
+              console.debug('[AUTH] Role promoted:', { from: existingRow.role, to: role, userId: u.id });
+            }
+          }
         }
         
         // Only update role if we're promoting to a higher role
