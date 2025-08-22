@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       .single()
 
     if (!readErr && existing) {
-      return json({ ok: true, profile: existing }, { status: 200 })
+      return json({ ok: true, path: 'existing', profile: existing }, { status: 200 })
     }
 
     if (status !== 406 && readErr) {
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] Profile upserted successfully:`, upserted)
 
-    return json({ ok: true, profile: upserted }, { status: 200 })
+    return json({ ok: true, path: 'created', profile: upserted }, { status: 200 })
   } catch (e) {
     const message = (e as Error)?.message ?? 'Unknown server error'
     return json({ error: message }, { status: 500 })
