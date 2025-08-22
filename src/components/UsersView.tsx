@@ -54,7 +54,7 @@ const UsersView = () => {
       case 'admin':
         return <Shield className="h-4 w-4 text-blue-500" />;
       default:
-        return <User className="h-4 w-4 text-gray-500" />;
+        return <UserCheck className="h-4 w-4 text-gray-500" />;
     }
   };
 
@@ -416,7 +416,7 @@ const UsersView = () => {
                       className="p-1 text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400"
                       title="Reset Password"
                     >
-                      <Shield className="h-4 w-4" />
+                      <Mail className="h-4 w-4" />
                     </button>
                   )}
                   {true && (

@@ -1,5 +1,47 @@
 # Bug / Issue Log
 
+## Bug Fix: User Management Icons & Budget Management Responsiveness (2025-08-22)
+- **Title**: Fix User Management icons and Budget Management responsive layout
+- **Summary**: 
+  - Fixed misleading Shield icon in User Management cards by replacing it with Mail icon for reset password
+  - Improved User role icon by replacing generic User icon with UserCheck for better clarity
+  - Enhanced Budget Management toolbar responsiveness to prevent horizontal scrolling on mobile devices
+
+- **Problem Summary**: 
+  - **User Management**: Shield icon was misleading for password reset functionality
+  - **User Management**: Generic User icon for regular users was redundant and unclear
+  - **Budget Management**: Top toolbar required horizontal scrolling on small screens, hiding "Add Entry" button
+
+- **Root Cause**: 
+  - **Icons**: Shield icon suggested security/permissions rather than email/password functionality
+  - **Layout**: Budget toolbar used fixed flexbox layout without proper responsive wrapping
+  - **Mobile UX**: Filters and buttons could overflow on small screens
+
+- **Changes Made**:
+  - **User Management Icons**:
+    - Replaced `Shield` with `Mail` icon for reset password button
+    - Replaced `User` with `UserCheck` icon for regular user roles
+  - **Budget Management Layout**:
+    - Changed toolbar to `flex flex-col lg:flex-row` for better mobile stacking
+    - Added `flex-wrap` to filters with `gap-2` for proper spacing
+    - Made "Add Entry" button `w-full sm:w-auto` for mobile-first design
+    - Added `flex-shrink-0` to right container to prevent button compression
+
+- **Status**: ✅ COMPLETED - Icons now intuitive, layout responsive on all devices
+- **Priority**: P3 - User experience improvement
+- **Date**: 2025-08-22
+- **Resolution Date**: 2025-08-22
+
+- **Files Changed**:
+  - `src/components/UsersView.tsx` - Fixed icon choices and improved clarity
+  - `src/components/BudgetView.tsx` - Enhanced responsive layout for mobile devices
+
+- **Verification Steps**:
+  1. **User Management Icons**: Reset password shows Mail icon, roles show appropriate icons
+  2. **Budget Management Mobile**: No horizontal scroll required on small screens
+  3. **Add Entry Button**: Always visible and properly sized on all screen sizes
+  4. **Filter Layout**: Filters wrap properly on narrow screens without overflow
+
 ## Bug Fix: User Management Card Icon Alignment (2024-12-19)
 - **Title**: Fix misaligned action icons in User Management cards
 - **Summary**: 

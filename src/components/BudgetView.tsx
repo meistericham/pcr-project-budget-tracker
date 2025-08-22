@@ -26,7 +26,7 @@ import CategorySpendingChart from './charts/CategorySpendingChart';
 
 const BudgetView = () => {
   const { projects, budgetEntries, budgetCodes, deleteBudgetEntry, setCurrentView, divisions, units } = useApp();
-  const { currentUser } = useAuth();
+  const { user, profile } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BudgetEntry | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -118,7 +118,7 @@ const BudgetView = () => {
     }
   };
 
-  const canAccessBudgetCodes = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+  const canAccessBudgetCodes = profile?.role === 'super_admin' || profile?.role === 'admin';
 
   const renderBudgetCodes = () => {
     const totalAllocatedBudget = budgetCodes.reduce((sum, code) => sum + code.budget, 0);
@@ -293,12 +293,14 @@ const BudgetView = () => {
     <div className="w-full h-full">
       <div className="p-4 lg:p-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
-          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
+          {/* Left side: Title and filters */}
+          <div className="flex flex-col space-y-3 flex-1 min-w-0">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Budget Overview
             </h2>
-            <div className="flex items-center space-x-2">
+            {/* Filters - wrap on small screens */}
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 value={selectedProject}
                 onChange={(e) => setSelectedProject(e.target.value)}
@@ -327,7 +329,9 @@ const BudgetView = () => {
               </select>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          
+          {/* Right side: Tabs and Add Entry button */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-shrink-0">
             {/* Tab Navigation */}
             <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
@@ -353,9 +357,10 @@ const BudgetView = () => {
                 </button>
               )}
             </div>
+            {/* Add Entry button - full width on mobile, auto width on larger screens */}
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
             >
               <Plus className="h-4 w-4" />
               <span>Add Entry</span>
