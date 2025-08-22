@@ -227,7 +227,7 @@ const AuthPage: React.FC = () => {
             © 2025 PCR Project & Budget Tracker. All rights reserved.
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            Developed by Crafted by Mohd Hisyamudin · Powered by AI
+            Concept by Mohd Hisyamudin · Engineered with AI
           </p>
         </div>
       </div>

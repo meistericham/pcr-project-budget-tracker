@@ -262,7 +262,7 @@ const Sidebar = () => {
            {!sidebarCollapsed && (
              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                <p className="text-xs text-gray-500 dark:text-gray-400">
-               Crafted by Mohd Hisyamudin · Powered by AI
+               Concept by Mohd Hisyamudin · Engineered with AI
                </p>
              </div>
            )}

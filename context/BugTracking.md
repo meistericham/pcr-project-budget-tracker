@@ -1,5 +1,80 @@
 # Bug / Issue Log
 
+## Bug Fix: Remove redundant "Assign Division/Unit" icon in User Management (2025-08-22)
+- **Title**: Remove redundant "Assign Division/Unit" icon in User Management
+- **Summary**: 
+  - Fixed redundant UI by removing the extra "Assign Division/Unit" (UserCheck) icon from user cards
+  - Streamlined action icons to show only Edit, Reset Password, and Delete
+  - Maintained assignment functionality through the existing "Assign Now" button in assignment section
+
+- **Problem Summary**: 
+  - **User Management**: User cards displayed an extra "Assign Division/Unit" (UserCheck) icon
+  - **Redundancy**: This icon duplicated functionality already available in the Edit modal and "Assign Now" button
+  - **UI Clutter**: Four action icons made the interface unnecessarily complex
+
+- **Root Cause**: 
+  - UserCheck icon button was added alongside Edit, Reset, and Delete icons
+  - Assignment functionality was already accessible through Edit modal and "Assign Now" button
+  - No user feedback indicated need for the extra icon
+
+- **Changes Made**:
+  - **Icon Removal**: Removed the entire UserCheck button with "Assign Division/Unit" title
+  - **Streamlined Actions**: Now shows exactly three icons: Edit, Reset Password, Delete
+  - **Functionality Preserved**: Assignment still works through Edit modal and "Assign Now" button
+  - **Layout Maintained**: Icon alignment and email truncation unaffected
+
+- **Status**: ✅ COMPLETED - UI now shows exactly three action icons per user card
+- **Priority**: P3 - User experience improvement
+- **Date**: 2025-08-22
+- **Resolution Date**: 2025-08-22
+- **Version**: v0.9.54
+
+- **Files Changed**:
+  - `src/components/UsersView.tsx` - Removed redundant UserCheck icon button
+
+- **Verification Steps**:
+  1. **Icon Count**: Each user card shows exactly three action icons
+  2. **Tooltips**: Edit User, Send Password Reset Email, Delete User
+  3. **Layout**: Long emails still truncate properly; icons remain aligned
+  4. **Functionality**: Assignment still works through Edit modal and "Assign Now" button
+
+## Bug Fix: Standardize date format in User Management cards (2025-08-22)
+- **Title**: Standardize date format in User Management cards
+- **Summary**: 
+  - Fixed inconsistent date formatting in User Management cards by standardizing to dd/MM/yyyy format
+  - Updated "Joined" date display to use the existing formatDate utility for consistency with other modules
+  - Ensured all date displays across the application follow the same DD/MM/YYYY format
+
+- **Problem Summary**: 
+  - **User Management**: "Joined" dates displayed in US format (MM/dd/yyyy) using toLocaleDateString()
+  - **Inconsistency**: Other modules (Budget, Projects) already used DD/MM/YYYY format via formatDate utility
+  - **User Experience**: Mixed date formats created confusion and inconsistency in the UI
+
+- **Root Cause**: 
+  - UsersView.tsx used `new Date(user.createdAt).toLocaleDateString()` which defaults to US locale
+  - No explicit locale specification meant dates appeared in MM/dd/yyyy format
+  - Inconsistent with the established DD/MM/YYYY format used throughout the application
+
+- **Changes Made**:
+  - **Date Formatting**: Replaced `toLocaleDateString()` with `formatDate(user.createdAt, 'DD/MM/YYYY')`
+  - **Import Added**: Added import for formatDate utility from '../utils/date'
+  - **Consistency**: Now matches the date format used in Budget, Projects, and other modules
+
+- **Status**: ✅ COMPLETED - All dates now display consistently as DD/MM/YYYY
+- **Priority**: P3 - User experience improvement
+- **Date**: 2025-08-22
+- **Resolution Date**: 2025-08-22
+- **Version**: v0.9.54
+
+- **Files Changed**:
+  - `src/components/UsersView.tsx` - Updated date formatting to use formatDate utility
+
+- **Verification Steps**:
+  1. **User Management Cards**: "Joined" dates display as dd/MM/yyyy (e.g., 22/08/2025)
+  2. **Format Consistency**: Matches date format in Budget, Projects, and other modules
+  3. **No TypeScript Errors**: Build completes successfully with npm run build
+  4. **Cross-module Verification**: All date displays follow DD/MM/YYYY format
+
 ## Bug Fix: User Management Icons & Budget Management Responsiveness (2025-08-22)
 - **Title**: Fix User Management icons and Budget Management responsive layout
 - **Summary**: 

@@ -22,6 +22,7 @@ import UserModal from './UserModal';
 import EmailModal from './EmailModal';
 import UserTable from './UserTable';
 import { useToast } from './Toast';
+import { formatDate } from '../utils/date';
 
 const UsersView = () => {
   const { users, deleteUser, divisions, units } = useApp();
@@ -398,36 +399,20 @@ const UsersView = () => {
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
-                  {true && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAssign(user);
-                      }}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
-                      title="Assign Division/Unit"
-                    >
-                      <UserCheck className="h-4 w-4" />
-                    </button>
-                  )}
-                  {true && (
-                    <button
-                      onClick={() => handleResetPassword(user)}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400"
-                      title="Reset Password"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </button>
-                  )}
-                  {true && (
-                    <button
-                      onClick={() => handleDelete(user)}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                      title="Delete User"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleResetPassword(user)}
+                    className="p-1 text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400"
+                    title="Send Password Reset Email"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user)}
+                    className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                    title="Delete User"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
@@ -501,7 +486,7 @@ const UsersView = () => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4" />
-                  <span>Joined {new Date(user.createdAt).toLocaleDateString()}</span>
+                  <span>Joined {formatDate(user.createdAt, 'DD/MM/YYYY')}</span>
                 </div>
               </div>
 
