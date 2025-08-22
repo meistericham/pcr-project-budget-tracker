@@ -1,5 +1,43 @@
 # Bug / Issue Log
 
+## Bug Fix: User Management Card Icon Alignment (2024-12-19)
+- **Title**: Fix misaligned action icons in User Management cards
+- **Summary**: 
+  - Fixed issue where action icons (Edit, Assign, Reset Password, Delete) were misaligned when user email addresses were long
+  - Refactored card header layout to use proper flexbox with left/right containers
+  - Added email truncation to prevent layout overflow
+
+- **Problem Summary**: 
+  - Long email addresses pushed action icons far to the right, making them hard to access
+  - Icons appeared scattered across the card instead of being neatly grouped
+  - Poor user experience when managing users with long email addresses
+
+- **Root Cause**: 
+  - Card header used simple flex layout without proper container separation
+  - Email field had no width constraints, allowing it to expand and push icons
+  - Action icons were not properly grouped in a right-aligned container
+
+- **Changes Made**:
+  - **Header Layout**: Restructured with `flex justify-between items-start`
+  - **Left Container**: Wrapped user info (avatar, name, email) with `min-w-0 flex-1`
+  - **Right Container**: Wrapped action icons with `flex-shrink-0 ml-3`
+  - **Email Truncation**: Added `truncate max-w-[200px]` to prevent overflow
+  - **Avatar Fix**: Added `flex-shrink-0` to prevent avatar compression
+
+- **Status**: ✅ COMPLETED - Icons now properly aligned and grouped
+- **Priority**: P3 - User experience improvement
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Files Changed**:
+  - `src/components/UsersView.tsx` - Fixed card header layout and icon alignment
+
+- **Verification Steps**:
+  1. **Short emails**: Icons appear neatly grouped on the right
+  2. **Long emails**: Icons stay pinned to the right, email truncates with ellipsis
+  3. **Responsive layout**: Icons maintain position across different screen sizes
+  4. **Hover states**: Action icons appear/disappear smoothly on card hover
+
 ## Investigating: users.name revert to email-localpart after hard refresh (2024-12-19)
 - **Title**: users.name revert to email-localpart after hard refresh
 - **Summary**: 
