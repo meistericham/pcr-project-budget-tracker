@@ -1,5 +1,44 @@
 # Bug / Issue Log
 
+## Bug Fix: users.updated_at select fix (2024-12-19)
+- **Title**: Remove updated_at from users table selects
+- **Summary**: 
+  - Fixed all users table selects to use specific fields instead of `select('*')`
+  - Removed references to `updated_at` field which doesn't exist in users table
+  - Updated database migration to drop users updated_at trigger
+  - Ensures consistent field selection across all user operations
+
+- **Problem Summary**: 
+  - Multiple users table selects were using `select('*')` which could include non-existent fields
+  - Database schema had updated_at trigger for users table but no updated_at column
+  - Potential for runtime errors if database structure changes
+
+- **Root Cause**: 
+  - Users table schema doesn't include updated_at column
+  - Select statements were using wildcard instead of specific field lists
+  - Database trigger was created for a non-existent column
+
+- **Changes Made**:
+  - **database.ts**: Updated all users selects to use specific fields: `id,email,name,initials,role,division_id,unit_id`
+  - **Database Migration**: Added command to drop users updated_at trigger
+  - **Field Consistency**: All user operations now use the same field set
+
+- **Status**: ✅ COMPLETED - All selects fixed and build passes
+- **Priority**: P3 - Code quality and consistency improvement
+- **Date**: 2024-12-19
+- **Resolution Date**: 2024-12-19
+
+- **Files Changed**:
+  - `src/lib/database.ts` - Fixed users table selects to use specific fields
+  - `database/add-division-unit-fields.sql` - Added trigger removal command
+  - `context/BugTracking.md` - Added bug fix entry
+
+- **Verification Steps**:
+  1. **Build verification**: npm run build passes without TypeScript errors
+  2. **Field consistency**: All users selects use identical field set
+  3. **No wildcards**: No more `select('*')` on users table
+  4. **Database migration**: Updated to handle trigger removal
+
 ## 🚨 CRITICAL: Project Edit blocked in UI while RLS allows (admin) (2024-12-19)
 - **Title**: Project Edit blocked in UI while RLS allows (admin)
 - **Summary**: 

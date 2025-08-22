@@ -1,6 +1,9 @@
 -- Add Division and Unit fields to Users table
 -- This migration adds division_id and unit_id fields and updates RLS policies
 
+-- Drop the users updated_at trigger since we're not adding that column
+DROP TRIGGER IF EXISTS update_users_updated_at ON public.users;
+
 -- Add division_id and unit_id columns to users table
 ALTER TABLE public.users 
 ADD COLUMN IF NOT EXISTS division_id UUID REFERENCES public.divisions(id) ON DELETE SET NULL,

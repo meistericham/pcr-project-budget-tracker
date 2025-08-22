@@ -160,28 +160,28 @@ export const userService = {
   
       // No-op guard
       if (Object.keys(patch).length === 0) {
-        const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+        const { data, error } = await supabase.from('users').select('id,email,name,initials,role,division_id,unit_id').eq('id', id).single();
         if (error) throw error;
         return transformUser(data);
       }
-  
+
       const { data, error, status } = await supabase
         .from('users')
         .update(patch)
         .eq('id', id)
-        .select('*')
+        .select('id,email,name,initials,role,division_id,unit_id')
         .single();
-  
+
       if (error) {
         if (error.message?.includes('Only super administrators')) {
           throw new Error('Permission denied: Only super administrators can change division or unit assignments.');
         }
         throw error;
       }
-  
+
       // Some PostgREST versions can 204 on update; fallback fetch
       if (!data) {
-        const { data: row, error: selErr } = await supabase.from('users').select('*').eq('id', id).single();
+        const { data: row, error: selErr } = await supabase.from('users').select('id,email,name,initials,role,division_id,unit_id').eq('id', id).single();
         if (selErr) throw selErr;
         return transformUser(row);
       }
