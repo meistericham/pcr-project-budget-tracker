@@ -61,8 +61,8 @@ Deno.serve(async (req) => {
 
     // Try to read existing profile
     const { data: existing, error: readErr, status } = await adminClient
-      .from('profiles')
-      .select('id, email, name, role, initials')
+      .from('users')
+      .select('id, email, name, role, initials, division_id, unit_id')
       .eq('id', uid)
       .single()
 
@@ -86,9 +86,9 @@ Deno.serve(async (req) => {
     }
 
     const { data: upserted, error: upErr } = await adminClient
-      .from('profiles')
+      .from('users')
       .upsert(profile, { onConflict: 'id' })
-      .select('id, email, name, role, initials')
+      .select('id, email, name, role, initials, division_id, unit_id')
       .single()
 
     if (upErr) {
