@@ -58,28 +58,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
       if (import.meta.env.DEV) {
         console.log('[UserProfileModal] save: name=', formData.name);
       }
-
-      // Optimistic update
+    
+      // Keep a copy of current profile for rollback
       const previous = profile;
+    
+      // Optimistic update (UI updates instantly)
       if (previous) {
         setProfile({ ...previous, name: formData.name });
       }
+    
+      // Save to DB
       const updated = await saveMyNameInline(formData.name);
-      setProfile(updated);
+    
+      // ✅ Merge updated fields into previous profile
+      // so you don’t lose division_id, unit_id, role, etc.
+      if (previous) {
+        setProfile({
+          ...previous,
+          ...updated,
+        });
+      } else {
+        setProfile(updated);
+      }
+    
       setSuccess(true);
-
+    
       // DEV console logging for successful save
       if (import.meta.env.DEV) {
-        console.log('[UserProfileModal] saved');
+        console.log('[UserProfileModal] saved', updated);
       }
-
+    
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (error) {
       if (profile) setProfile(profile); // rollback
       setErrorMsg((error as any)?.message || 'Failed to save profile. Please try again.');
-
+    
       // DEV console logging for failed save
       if (import.meta.env.DEV) {
         console.log('[UserProfileModal] failed', error);

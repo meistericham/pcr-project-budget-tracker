@@ -137,18 +137,29 @@ export async function saveMyNameInline(newName: string): Promise<AppProfile> {
   const uid = ures?.user?.id;
   if (!uid) throw new Error('Not signed in');
 
+  // derive initials from the new name (e.g., "Mohd Hisyamudin" -> "MH")
+  const initials =
+    newName
+      .trim()
+      .split(/\s+/)
+      .map(s => s[0]?.toUpperCase() ?? '')
+      .join('')
+      .slice(0, 2) || null;
+
   const { data, error } = await supabase
     .from('users')
-    .update({ name: newName })
+    .update({ name: newName, initials }) // ← update both
     .eq('id', uid)
     .select('id,email,name,initials,division_id,unit_id,role')
     .single();
 
   if (error) throw new Error(error.message);
   const updated = data as AppProfile;
+
+  // notify listeners (your useMyProfile hook already listens for this)
   try {
     window.dispatchEvent(new CustomEvent('profile-updated', { detail: updated }));
   } catch {}
+
   return updated;
 }
-
