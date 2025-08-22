@@ -68,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(mapUser(u));
         if (u?.id) {
           await syncProfile();
-          await upsertUserProfile(data.session);
+          await refreshCurrentUser(); // ⬅️ add this line
         } else {
           setRole(null);
           setProfile(null);
@@ -84,9 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
       const u = session?.user ?? null;
       setUser(mapUser(u));
+      
       if (u?.id) {
+        // Always fetch the latest DB profile into React state
         syncProfile();
-        upsertUserProfile(session);
+    
+        // 🚫 Only run upsert on SIGNED_IN (first login),
+        // not on every token refresh or state change
+        if (_event === 'SIGNED_IN') {
+          upsertUserProfile(session);
+        }
       } else {
         setRole(null);
         setProfile(null);
