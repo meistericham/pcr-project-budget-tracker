@@ -90,6 +90,9 @@ interface AppContextType {
   deleteNotification: (id: string) => void;
   getUnreadNotificationCount: () => number;
   createTestNotification: (type: Notification['type']) => void;
+
+  // Manual data refresh
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1512,6 +1515,57 @@ const updateUser = async (id: string, updates: Partial<User>) => {
     }
   };
 
+  const refreshData = async () => {
+    if (!useServerDb) {
+      console.log('[CTX] refreshData called in non-server mode. No-op.');
+      return;
+    }
+    console.log('[CTX] Refreshing data from server...');
+    try {
+        const usersP = userService.getAll();
+        const codesP = budgetCodeService.getAll();
+        const projectsP = projectService.getAll();
+        const entriesP = budgetEntryService.getAll();
+        const notifsP = notificationService.getAll();
+        const divisionsP = dbListDivisions();
+        const unitsP = dbListUnits();
+
+        const [
+            remoteUsers,
+            remoteCodes,
+            remoteProjects,
+            remoteEntries,
+            remoteNotifs,
+            remoteDivisions,
+            remoteUnits,
+        ] = await Promise.all([usersP, codesP, projectsP, entriesP, notifsP, divisionsP, unitsP]);
+
+        setUsers(remoteUsers);
+        setBudgetCodes(remoteCodes);
+        setProjects(remoteProjects);
+        setBudgetEntries(remoteEntries);
+        setNotifications(remoteNotifs);
+        setDivisions(remoteDivisions.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            ...(r.code ? { code: r.code } : {}),
+            createdAt: r.created_at,
+            createdBy: r.created_by || '',
+        })));
+        setUnits(remoteUnits.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            ...(r.code ? { code: r.code } : {}),
+            divisionId: r.division_id,
+            createdAt: r.created_at,
+            createdBy: r.created_by || '',
+        })));
+        console.log('[CTX] Data refreshed successfully.');
+    } catch (error) {
+        console.error('[CTX] Failed to refresh data:', error);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1565,6 +1619,8 @@ const updateUser = async (id: string, updates: Partial<User>) => {
         deleteNotification,
         getUnreadNotificationCount,
         createTestNotification,
+
+        refreshData,
       }}
     >
       {children}

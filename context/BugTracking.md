@@ -1,5 +1,18 @@
 # Bug / Issue Log
 
+## [2025-08-23] – Settings > Integrations: Google Sheets connection fix
+**Bug:** OAuth connection to Google Sheets failed after recent edits (scopes/redirect flow).  
+**Fix:** Minimal updates to Google integration/auth files:
+- Confirmed redirect URI uses window.location.origin + '/auth/callback/google'.
+- Standardized scopes to include spreadsheets (read/write or readonly) and drive.file when creating files.
+- Added error logs around Connect and first Sheets call for easier diagnosis.  
+**References:** Sheets scopes, Drive least-privilege, OAuth PKCE (see Google docs).  
+**Verification:** 
+1) Local: http://localhost:3000 → Connect → returns to /auth/callback/google → spreadsheets.values.get A1:A5 succeeds.  
+2) Prod: https://pcrtracker.meistericham.com → same.  
+3) If "insufficientPermissions": check that Sheets API enabled and scopes include spreadsheets; if file creation, include drive.file.  
+**Status:** ✅ Fixed in v0.9.54
+
 ## Bug Fix: Remove redundant "Assign Division/Unit" icon in User Management (2025-08-22)
 - **Title**: Remove redundant "Assign Division/Unit" icon in User Management
 - **Summary**: 

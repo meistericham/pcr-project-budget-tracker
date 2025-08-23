@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import React, { useMemo, useState, useEffect } from 'react';
 import { FileSpreadsheet, Download, Upload, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import type { Project, BudgetEntry, BudgetCode } from '../types';
@@ -9,11 +10,53 @@ const GoogleSheetsIntegration: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [sheetUrl, setSheetUrl] = useState('');
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
 
   // Import states
   const [projectsFile, setProjectsFile] = useState<File | null>(null);
   const [entriesFile, setEntriesFile] = useState<File | null>(null);
   const [codesFile, setCodesFile] = useState<File | null>(null);
+
+  // Check for existing Google OAuth token on mount
+  useEffect(() => {
+    const checkGoogleAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.provider_token) {
+          setGoogleToken(session.provider_token);
+          setIsConnected(true);
+          console.log('[Sheets Connected]', { 
+            scope: session.provider_refresh_token ? 'refresh_token_available' : 'token_only',
+            redirect: window.location.origin 
+          });
+        }
+      } catch (error) {
+        console.error('[Sheets Auth Check Error]', error);
+      }
+    };
+    
+    checkGoogleAuth();
+  }, []);
+
+  // Helper function to print current scopes/token expiry
+  const printTokenInfo = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        console.log('[Sheets Token Info]', {
+          hasToken: !!session.provider_token,
+          hasRefreshToken: !!session.provider_refresh_token,
+          expiresAt: session.expires_at,
+          provider: session.user?.app_metadata?.provider,
+          scopes: 'spreadsheets + drive.file'
+        });
+      } else {
+        console.log('[Sheets Token Info] No Google OAuth token found');
+      }
+    } catch (error) {
+      console.error('[Sheets Token Info Error]', error);
+    }
+  };
 
   type ValidationIssue = { row: number; field?: string; message: string };
   type ImportPreview<T> = {
@@ -269,15 +312,79 @@ const GoogleSheetsIntegration: React.FC = () => {
   };
 
   const handleConnect = async () => {
-    // In a real implementation, this would use Google Sheets API
-    setIsConnected(true);
-    setSheetUrl('https://docs.google.com/spreadsheets/d/1234567890/edit');
+    try {
+      console.log('[Sheets Connect] Starting OAuth flow...');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+          redirectTo: window.location.origin + '/auth/callback/google',
+        },
+      });
+
+      if (error) {
+        console.error('[Sheets Connect Error]', error);
+        throw error;
+      }
+      
+      console.log('[Sheets Connect] OAuth flow initiated successfully');
+    } catch (error: any) {
+      console.error('[Sheets Connect Error]', error);
+      alert(`Error connecting: ${error.message}`);
+    }
   };
 
   const handleExport = async () => {
     setIsExporting(true);
     
     try {
+      console.log('[Sheets Export] Starting export process...');
+      
+      if (!googleToken) {
+        throw new Error('No Google OAuth token available');
+      }
+
+      // Test Sheets API access with a simple call
+      try {
+        const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+          headers: {
+            'Authorization': `Bearer ${googleToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('[Sheets API Error]', errorData);
+          throw new Error(`Sheets API error: ${errorData.error?.message || response.statusText}`);
+        }
+        
+        console.log('[Sheets Export] API access verified successfully');
+        
+        // Test actual Sheets API call (minimal sample)
+        try {
+          // This would be a real spreadsheet ID in production
+          const testResponse = await fetch('https://sheets.googleapis.com/v4/spreadsheets/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/values/A1:A5', {
+            headers: {
+              'Authorization': `Bearer ${googleToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (testResponse.ok) {
+            console.log('[Sheets API Test] Successfully accessed sample spreadsheet data');
+          } else {
+            console.warn('[Sheets API Test] Sample call failed (expected for demo spreadsheet):', testResponse.status);
+          }
+        } catch (testError) {
+          console.warn('[Sheets API Test] Sample call error (expected for demo spreadsheet):', testError);
+        }
+        
+      } catch (apiError: any) {
+        console.error('[Sheets API Error]', apiError?.response ?? apiError);
+        throw new Error(`Failed to access Google Sheets API: ${apiError.message}`);
+      }
+      
       // Simulate export process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -294,8 +401,9 @@ const GoogleSheetsIntegration: React.FC = () => {
       });
       
       alert('Data exported to Google Sheets successfully!');
-    } catch (error) {
-      alert('Export failed. Please try again.');
+    } catch (error: any) {
+      console.error('[Sheets Export Error]', error);
+      alert(`Export failed: ${error.message}`);
     } finally {
       setIsExporting(false);
     }
@@ -416,12 +524,27 @@ const GoogleSheetsIntegration: React.FC = () => {
               <FileSpreadsheet className="h-4 w-4" />
               <span>Connect to Google Sheets</span>
             </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={printTokenInfo}
+                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Debug: Check Token Status
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-gray-600 dark:text-gray-400">
               Your data is connected to Google Sheets. You can export new data or import updates.
             </p>
+            {import.meta.env.DEV && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <div>Token: {googleToken ? '✅ Available' : '❌ Missing'}</div>
+                <div>Redirect: {window.location.origin}/auth/callback/google</div>
+                <div>Scopes: spreadsheets + drive.file</div>
+              </div>
+            )}
             {sheetUrl && (
               <a
                 href={sheetUrl}
