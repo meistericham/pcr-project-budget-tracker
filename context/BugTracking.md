@@ -1,5 +1,18 @@
 # Bug / Issue Log
 
+## [2025-08-24] – Settings > Integrations: Google Sheets connect & export hardening
+**Bug:** CORS failure on REST fetch; missing/ephemeral provider_token; insufficient scopes caused 401/403.
+**Fix:** Capture provider_token at callback; request scopes (spreadsheets, drive.file); switch export to gapi.client.sheets; minimal logs for diagnosis.
+**Files changed:** index.html, src/lib/googleAuth.ts (NEW), src/components/GoogleSheetsIntegration.tsx
+**Verification:** 
+1) Local test: sign out → sign in (consent shows Sheets + drive.file) → Export → verify row A1:C1 in the target sheet.
+2) Prod test: same on https://pcrtracker.meistericham.com
+3) Failure messages to expect & fix:
+   - 401/UNAUTHENTICATED → wrong/expired token → re-login or capture token on callback
+   - 403/insufficientPermissions → missing 'spreadsheets' write scope or writing a file not owned under drive.file
+   - CORS/Failed to fetch → ensure gapi path is used, not fetch
+**Status:** ✅ Fixed (v0.9.54)
+
 ## [2025-08-23] – Settings > Integrations: Google Sheets connection fix
 **Bug:** OAuth connection to Google Sheets failed after recent edits (scopes/redirect flow).  
 **Fix:** Minimal updates to Google integration/auth files:

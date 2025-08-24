@@ -3,9 +3,10 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { FileSpreadsheet, Download, Upload, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import type { Project, BudgetEntry, BudgetCode } from '../types';
+import { initGoogleAPI, getStoredGoogleToken, setGoogleToken, clearStoredGoogleToken, handleGoogleCallback } from '../lib/googleAuth';
 
 const GoogleSheetsIntegration: React.FC = () => {
-  const { projects, budgetEntries, budgetCodes, users } = useApp();
+  const { projects, budgetEntries, budgetCodes, users, units } = useApp();
   const [isConnected, setIsConnected] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -17,37 +18,66 @@ const GoogleSheetsIntegration: React.FC = () => {
   const [entriesFile, setEntriesFile] = useState<File | null>(null);
   const [codesFile, setCodesFile] = useState<File | null>(null);
 
-  // Check for existing Google OAuth token on mount
+  // Initialize Google API and check for existing tokens on mount
   useEffect(() => {
-    const checkGoogleAuth = async () => {
+    const initializeGoogle = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.provider_token) {
-          setGoogleToken(session.provider_token);
+        // Initialize Google API
+        const apiInitialized = await initGoogleAPI();
+        if (!apiInitialized) {
+          console.error('[Sheets] Failed to initialize Google API');
+          return;
+        }
+
+        // Check for stored Google token
+        const storedToken = getStoredGoogleToken();
+        if (storedToken) {
+          setGoogleToken(storedToken);
+          setGoogleToken(storedToken); // Set for gapi client
           setIsConnected(true);
           console.log('[Sheets Connected]', { 
-            scope: session.provider_refresh_token ? 'refresh_token_available' : 'token_only',
+            scope: 'stored_token',
             redirect: window.location.origin 
           });
+        } else {
+          // Fallback: check Supabase session for provider_token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.provider_token) {
+            setGoogleToken(session.provider_token);
+            setGoogleToken(session.provider_token); // Set for gapi client
+            setIsConnected(true);
+            console.log('[Sheets Connected]', { 
+              scope: session.provider_refresh_token ? 'refresh_token_available' : 'token_only',
+              redirect: window.location.origin 
+            });
+          }
         }
       } catch (error) {
         console.error('[Sheets Auth Check Error]', error);
       }
     };
     
-    checkGoogleAuth();
+    initializeGoogle();
+  }, []);
+
+  // Handle OAuth callback when component mounts
+  useEffect(() => {
+    handleOAuthCallback();
   }, []);
 
   // Helper function to print current scopes/token expiry
   const printTokenInfo = async () => {
     try {
+      const storedToken = getStoredGoogleToken();
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.provider_token) {
+      
+      if (storedToken || session?.provider_token) {
         console.log('[Sheets Token Info]', {
-          hasToken: !!session.provider_token,
-          hasRefreshToken: !!session.provider_refresh_token,
-          expiresAt: session.expires_at,
-          provider: session.user?.app_metadata?.provider,
+          hasStoredToken: !!storedToken,
+          hasProviderToken: !!session?.provider_token,
+          hasRefreshToken: !!session?.provider_refresh_token,
+          expiresAt: session?.expires_at,
+          provider: session?.user?.app_metadata?.provider,
           scopes: 'spreadsheets + drive.file'
         });
       } else {
@@ -55,6 +85,25 @@ const GoogleSheetsIntegration: React.FC = () => {
       }
     } catch (error) {
       console.error('[Sheets Token Info Error]', error);
+    }
+  };
+
+  // Handle OAuth callback when returning from Google
+  const handleOAuthCallback = async () => {
+    if (window.location.pathname === '/auth/callback/google') {
+      try {
+        console.log('[Sheets] Handling OAuth callback...');
+        const token = await handleGoogleCallback();
+        if (token) {
+          setGoogleToken(token);
+          setIsConnected(true);
+          console.log('[Sheets] OAuth callback successful, token captured');
+          // Redirect back to main page
+          window.history.replaceState({}, '', '/');
+        }
+      } catch (error) {
+        console.error('[Sheets] OAuth callback failed:', error);
+      }
     }
   };
 
@@ -188,10 +237,13 @@ const GoogleSheetsIntegration: React.FC = () => {
       if (name) nameToId.set(name.toLowerCase(), id);
 
       const now = new Date().toISOString();
+      // Use first available unit or generate placeholder
+      const defaultUnitId = units.length > 0 ? units[0].id : 'default-unit';
       items.push({
         id,
         name: name || '',
         description: '',
+        unitId: defaultUnitId,
         status: (statusRaw as Project['status']) || 'planning',
         priority: (priorityRaw as Project['priority']) || 'low',
         startDate: startDate || now.slice(0, 10),
@@ -319,6 +371,10 @@ const GoogleSheetsIntegration: React.FC = () => {
         options: {
           scopes: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
           redirectTo: window.location.origin + '/auth/callback/google',
+          queryParams: {
+            prompt: 'consent',
+            access_type: 'offline'
+          }
         },
       });
 
@@ -344,61 +400,82 @@ const GoogleSheetsIntegration: React.FC = () => {
         throw new Error('No Google OAuth token available');
       }
 
-      // Test Sheets API access with a simple call
+      // Set token for gapi client
+      setGoogleToken(googleToken);
+
+      // Test Sheets API access with gapi.client
       try {
-        const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-          headers: {
-            'Authorization': `Bearer ${googleToken}`,
-            'Content-Type': 'application/json',
-          },
+        const response = await window.gapi.client.sheets.spreadsheets.get({
+          spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
         });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('[Sheets API Error]', errorData);
-          throw new Error(`Sheets API error: ${errorData.error?.message || response.statusText}`);
-        }
         
         console.log('[Sheets Export] API access verified successfully');
         
         // Test actual Sheets API call (minimal sample)
         try {
-          // This would be a real spreadsheet ID in production
-          const testResponse = await fetch('https://sheets.googleapis.com/v4/spreadsheets/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/values/A1:A5', {
-            headers: {
-              'Authorization': `Bearer ${googleToken}`,
-              'Content-Type': 'application/json',
-            },
+          const testResponse = await window.gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+            range: 'A1:C1'
           });
           
-          if (testResponse.ok) {
+          if (testResponse.status === 200) {
             console.log('[Sheets API Test] Successfully accessed sample spreadsheet data');
           } else {
             console.warn('[Sheets API Test] Sample call failed (expected for demo spreadsheet):', testResponse.status);
           }
-        } catch (testError) {
+        } catch (testError: any) {
           console.warn('[Sheets API Test] Sample call error (expected for demo spreadsheet):', testError);
         }
         
       } catch (apiError: any) {
-        console.error('[Sheets API Error]', apiError?.response ?? apiError);
-        throw new Error(`Failed to access Google Sheets API: ${apiError.message}`);
+        console.error('[Sheets API Error]', apiError);
+        throw new Error(`Failed to access Google Sheets API: ${apiError.message || 'Unknown error'}`);
       }
       
-      // Simulate export process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check if we have a spreadsheet ID
+      if (!sheetUrl) {
+        throw new Error('Please create or specify a spreadsheet ID first');
+      }
       
-      // In a real implementation, this would:
-      // 1. Create or update a Google Sheet
-      // 2. Export projects, budget entries, and budget codes
-      // 3. Format the data properly
+      // Extract spreadsheet ID from URL
+      const sheetId = sheetUrl.includes('spreadsheets/d/') 
+        ? sheetUrl.split('spreadsheets/d/')[1].split('/')[0]
+        : sheetUrl;
       
-      console.log('Exporting to Google Sheets:', {
-        projects,
-        budgetEntries,
-        budgetCodes,
-        users
+      // Write test data to A1:C1
+      const testData = [['Project', 'Owner', 'Status']];
+      await window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: 'A1:C1',
+        valueInputOption: 'RAW',
+        resource: { values: testData }
       });
+      
+      console.log('[Sheets update OK] Test data written to A1:C1');
+      
+      // Export actual data
+      const projectsData = [
+        ['Project Name', 'Status', 'Priority', 'Start Date', 'End Date', 'Budget', 'Spent', 'Remaining'],
+        ...projects.map(project => [
+          project.name,
+          project.status,
+          project.priority,
+          project.startDate,
+          project.endDate,
+          project.budget.toString(),
+          project.spent.toString(),
+          (project.budget - project.spent).toString()
+        ])
+      ];
+      
+      await window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: 'A3',
+        valueInputOption: 'RAW',
+        resource: { values: projectsData }
+      });
+      
+      console.log('[Sheets update OK] Projects exported successfully');
       
       alert('Data exported to Google Sheets successfully!');
     } catch (error: any) {
@@ -524,6 +601,18 @@ const GoogleSheetsIntegration: React.FC = () => {
               <FileSpreadsheet className="h-4 w-4" />
               <span>Connect to Google Sheets</span>
             </button>
+            <button
+              onClick={() => {
+                clearStoredGoogleToken();
+                setGoogleToken(null);
+                setIsConnected(false);
+                setSheetUrl('');
+                console.log('[Sheets] Disconnected and cleared tokens');
+              }}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              <span>Disconnect</span>
+            </button>
             {import.meta.env.DEV && (
               <button
                 onClick={printTokenInfo}
@@ -538,6 +627,54 @@ const GoogleSheetsIntegration: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400">
               Your data is connected to Google Sheets. You can export new data or import updates.
             </p>
+            
+            {/* Spreadsheet ID Input */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Google Spreadsheet ID
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="Enter spreadsheet ID or leave empty to create new"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={sheetUrl}
+                  onChange={(e) => setSheetUrl(e.target.value)}
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      if (!googleToken) throw new Error('No token available');
+                      setGoogleToken(googleToken);
+                      
+                      // Create new spreadsheet
+                      const response = await window.gapi.client.sheets.spreadsheets.create({
+                        properties: {
+                          title: 'PCR Tracker Export'
+                        }
+                      });
+                      
+                      if (response.status === 200) {
+                        const newSheetId = response.result.spreadsheetId;
+                        const newSheetUrl = `https://docs.google.com/spreadsheets/d/${newSheetId}`;
+                        setSheetUrl(newSheetUrl);
+                        console.log('[Sheets] Created new spreadsheet:', newSheetId);
+                      }
+                    } catch (error) {
+                      console.error('[Sheets] Create sheet error:', error);
+                      alert('Failed to create spreadsheet. Please check console for details.');
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                >
+                  Create New
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Leave empty to create a new spreadsheet, or paste an existing spreadsheet ID
+              </p>
+            </div>
+            
             {import.meta.env.DEV && (
               <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
                 <div>Token: {googleToken ? '✅ Available' : '❌ Missing'}</div>
