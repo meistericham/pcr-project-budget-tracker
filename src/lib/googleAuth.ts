@@ -64,9 +64,12 @@ export const initGoogleAPI = async (): Promise<boolean> => {
   }
 };
 
-export const setGoogleToken = (token: string): void => {
+export const setGoogleToken = (token: string): boolean => {
   if (window.gapi?.client) {
     window.gapi.client.setToken({ access_token: token });
-    console.log('[Google API] Token set successfully');
+    const isSet = !!window.gapi.client.getToken()?.access_token;
+    console.log('[Google API] Token set successfully:', isSet);
+    return isSet;
   }
+  return false;
 };

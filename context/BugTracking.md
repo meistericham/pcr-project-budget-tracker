@@ -1,5 +1,12 @@
 # Bug / Issue Log
 
+## [2025-08-24] – Fix 401 Unauthorized for Google Sheets create/export
+**Bug:** gapi API calls failing due to missing or mis-set access token.
+**Fix:** Explicitly set `gapi.client.setToken({access_token: ...})` right before Sheets call and logged token presence.
+**Files changed:** GoogleSheetsIntegration.tsx, googleAuth.ts (enhanced token validation).
+**Verification:** Show `[gapi token set?] YES` log then successful 200 response after create or update.
+**Status:** ✅ Fixed (v0.9.54)
+
 ## [2025-08-24] – Settings > Integrations: Google Sheets connect & export hardening
 **Bug:** CORS failure on REST fetch; missing/ephemeral provider_token; insufficient scopes caused 401/403.
 **Fix:** Capture provider_token at callback; request scopes (spreadsheets, drive.file); switch export to gapi.client.sheets; minimal logs for diagnosis.

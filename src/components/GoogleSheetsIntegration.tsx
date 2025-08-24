@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { FileSpreadsheet, Download, Upload, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import type { Project, BudgetEntry, BudgetCode } from '../types';
-import { initGoogleAPI, getStoredGoogleToken, setGoogleToken, clearStoredGoogleToken, handleGoogleCallback } from '../lib/googleAuth';
+import { initGoogleAPI, getStoredGoogleToken, setGoogleToken as setGapiToken, clearStoredGoogleToken, handleGoogleCallback } from '../lib/googleAuth';
 
 const GoogleSheetsIntegration: React.FC = () => {
   const { projects, budgetEntries, budgetCodes, users, units } = useApp();
@@ -33,7 +33,7 @@ const GoogleSheetsIntegration: React.FC = () => {
         const storedToken = getStoredGoogleToken();
         if (storedToken) {
           setGoogleToken(storedToken);
-          setGoogleToken(storedToken); // Set for gapi client
+          setGapiToken(storedToken); // Set for gapi client
           setIsConnected(true);
           console.log('[Sheets Connected]', { 
             scope: 'stored_token',
@@ -44,7 +44,7 @@ const GoogleSheetsIntegration: React.FC = () => {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.provider_token) {
             setGoogleToken(session.provider_token);
-            setGoogleToken(session.provider_token); // Set for gapi client
+            setGapiToken(session.provider_token); // Set for gapi client
             setIsConnected(true);
             console.log('[Sheets Connected]', { 
               scope: session.provider_refresh_token ? 'refresh_token_available' : 'token_only',
@@ -400,8 +400,18 @@ const GoogleSheetsIntegration: React.FC = () => {
         throw new Error('No Google OAuth token available');
       }
 
-      // Set token for gapi client
-      setGoogleToken(googleToken);
+      // Set token for gapi client and validate
+      const token = getStoredGoogleToken() || googleToken;
+      if (!token) {
+        throw new Error('No Google OAuth token available');
+      }
+      
+      const tokenSet = setGapiToken(token);
+      console.log('[gapi token set?]', tokenSet);
+      if (!tokenSet) {
+        console.error('[Sheets] No valid token, re-login required');
+        throw new Error('Token not properly set in gapi client. Please reconnect.');
+      }
 
       // Test Sheets API access with gapi.client
       try {
@@ -644,8 +654,16 @@ const GoogleSheetsIntegration: React.FC = () => {
                 <button
                   onClick={async () => {
                     try {
-                      if (!googleToken) throw new Error('No token available');
-                      setGoogleToken(googleToken);
+                      const token = getStoredGoogleToken() || googleToken;
+                      if (!token) throw new Error('No token available');
+                      
+                      // Set token for gapi client and validate
+                      const tokenSet = setGapiToken(token);
+                      console.log('[gapi token set?]', tokenSet);
+                      if (!tokenSet) {
+                        console.error('[Sheets] No valid token, re-login required');
+                        throw new Error('Token not properly set in gapi client. Please reconnect.');
+                      }
                       
                       // Create new spreadsheet
                       const response = await window.gapi.client.sheets.spreadsheets.create({
