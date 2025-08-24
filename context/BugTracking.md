@@ -1,5 +1,12 @@
 # Bug / Issue Log
 
+## [2025-08-24] – Settings > Backup: manual CSV/ZIP download + optional Google Drive upload
+**Feature:** Added manual backup: export selected tables as CSV, ZIP all, and optionally upload to Google Drive via multipart.
+**How it works:** Supabase `.select().csv()` for each table, JSZip to bundle, Drive API v3 multipart for upload.
+**Scopes:** Requires user Google token with `https://www.googleapis.com/auth/drive.file`. (Least-privilege; user can manage files the app creates.)
+**Verify:** 1) Download ZIP contains CSVs. 2) Upload creates a file in Drive. 3) Re-run export without page reload.
+**Status:** ✅ Implemented (v0.9.61)
+
 ## [2025-08-24] – Fix 401 Unauthorized for Google Sheets create/export
 **Bug:** gapi API calls failing due to missing or mis-set access token.
 **Fix:** Explicitly set `gapi.client.setToken({access_token: ...})` right before Sheets call and logged token presence.

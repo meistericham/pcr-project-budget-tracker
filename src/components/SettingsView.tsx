@@ -14,7 +14,10 @@ import {
   Hash,
   ExternalLink,
   FileSpreadsheet,
-  Key
+  Key,
+  Download,
+  Upload,
+  Archive
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useIsSuperAdmin } from '../lib/authz';
@@ -23,6 +26,19 @@ import DatabaseSetup from './DatabaseSetup';
 import DatabaseStatus from './DatabaseStatus';
 import GoogleSheetsIntegration from './GoogleSheetsIntegration'; 
 import PasswordChangeModal from './PasswordChangeModal';
+import { 
+  exportTablesAsCsv, 
+  zipCsvMap, 
+  downloadBlob, 
+  generateBackupFilename, 
+  getAvailableTables 
+} from '../lib/backup';
+import { 
+  initGapi, 
+  setDriveToken, 
+  uploadZipToDrive, 
+  getStoredGoogleToken 
+} from '../lib/driveUpload';
 
 
 const SettingsView = () => {
@@ -50,6 +66,11 @@ const SettingsView = () => {
   const [divisionNameDraft, setDivisionNameDraft] = useState('');
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [unitNameDraft, setUnitNameDraft] = useState('');
+  
+  // Backup state
+  const [selectedTables, setSelectedTables] = useState<string[]>(['users', 'divisions', 'units', 'projects', 'budget_entries', 'budget_codes']);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupProgress, setBackupProgress] = useState<string>('');
 
   const [formData, setFormData] = useState({
     companyName: settings.companyName,
@@ -96,6 +117,95 @@ const SettingsView = () => {
   };
 
   const isSuperAdmin = !!isSA;
+
+  // Backup actions
+  const handleDownloadCsv = async () => {
+    setIsBackingUp(true);
+    setBackupProgress('Exporting tables as CSV...');
+    
+    try {
+      const csvFiles = await exportTablesAsCsv(selectedTables);
+      
+      // Download each CSV separately
+      Object.entries(csvFiles).forEach(([filename, content]) => {
+        const blob = new Blob([content], { type: 'text/csv' });
+        downloadBlob(blob, filename);
+      });
+      
+      setBackupProgress('CSV files downloaded successfully!');
+      setTimeout(() => setBackupProgress(''), 3000);
+    } catch (error) {
+      console.error('[Backup] CSV export failed:', error);
+      setBackupProgress(`Error: ${error instanceof Error ? error.message : 'Export failed'}`);
+      setTimeout(() => setBackupProgress(''), 5000);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    setIsBackingUp(true);
+    setBackupProgress('Creating backup ZIP...');
+    
+    try {
+      const csvFiles = await exportTablesAsCsv(selectedTables);
+      const zipBlob = await zipCsvMap(csvFiles);
+      const filename = generateBackupFilename();
+      
+      downloadBlob(zipBlob, filename);
+      setBackupProgress('ZIP backup downloaded successfully!');
+      setTimeout(() => setBackupProgress(''), 3000);
+    } catch (error) {
+      console.error('[Backup] ZIP creation failed:', error);
+      setBackupProgress(`Error: ${error instanceof Error ? error.message : 'ZIP creation failed'}`);
+      setTimeout(() => setBackupProgress(''), 5000);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleUploadToDrive = async () => {
+    setIsBackingUp(true);
+    setBackupProgress('Preparing Drive upload...');
+    
+    try {
+      // Check for Google token
+      const token = getStoredGoogleToken();
+      if (!token) {
+        throw new Error('No Google access token found. Please connect to Google first.');
+      }
+      
+      // Initialize Drive API
+      setBackupProgress('Initializing Google Drive...');
+      const gapiInitialized = await initGapi();
+      if (!gapiInitialized) {
+        throw new Error('Failed to initialize Google Drive API');
+      }
+      
+      // Set token
+      setDriveToken(token);
+      
+      // Create and upload ZIP
+      setBackupProgress('Creating backup ZIP...');
+      const csvFiles = await exportTablesAsCsv(selectedTables);
+      const zipBlob = await zipCsvMap(csvFiles);
+      const filename = generateBackupFilename();
+      
+      setBackupProgress('Uploading to Google Drive...');
+      const driveLink = await uploadZipToDrive(zipBlob, filename);
+      
+      setBackupProgress('Upload successful! Opening Drive...');
+      window.open(driveLink, '_blank');
+      setTimeout(() => setBackupProgress(''), 3000);
+      
+    } catch (error) {
+      console.error('[Backup] Drive upload failed:', error);
+      setBackupProgress(`Error: ${error instanceof Error ? error.message : 'Drive upload failed'}`);
+      setTimeout(() => setBackupProgress(''), 5000);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon, adminOnly: false },
@@ -509,10 +619,11 @@ const SettingsView = () => {
 
   const renderBackupSettings = () => (
     <div className="space-y-6">
+      {/* Automatic Backup Settings */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Database className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Backup Settings</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Automatic Backup</h3>
         </div>
         <div className="space-y-4">
           <label className="flex items-center space-x-3">
@@ -536,6 +647,90 @@ const SettingsView = () => {
               Last backup: Today at 2:00 AM
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Manual Backup Actions */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Archive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Manual Backup</h3>
+        </div>
+        
+        {/* Table Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Select Tables to Backup:
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {getAvailableTables().map(table => (
+              <label key={table} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedTables.includes(table)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedTables(prev => [...prev, table]);
+                    } else {
+                      setSelectedTables(prev => prev.filter(t => t !== table));
+                    }
+                  }}
+                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{table}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Selected: {selectedTables.length} of {getAvailableTables().length} tables
+          </p>
+        </div>
+
+        {/* Progress Display */}
+        {backupProgress && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              {backupProgress}
+            </p>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={handleDownloadCsv}
+            disabled={isBackingUp || selectedTables.length === 0}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            <span>Download as CSV (separately)</span>
+          </button>
+          
+          <button
+            onClick={handleDownloadZip}
+            disabled={isBackingUp || selectedTables.length === 0}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Archive className="h-4 w-4" />
+            <span>Download ZIP</span>
+          </button>
+          
+          <button
+            onClick={handleUploadToDrive}
+            disabled={isBackingUp || selectedTables.length === 0}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Upload ZIP to Google Drive</span>
+          </button>
+        </div>
+
+        {/* Help Text */}
+        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            <strong>Note:</strong> Google Drive upload requires you to be connected to Google (see Integrations tab). 
+            The backup will be uploaded to your Drive with the filename: backup-YYYYMMDD-HHmm.zip
+          </p>
         </div>
       </div>
     </div>
