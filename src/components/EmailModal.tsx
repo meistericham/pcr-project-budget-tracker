@@ -131,12 +131,12 @@ const EmailModal: React.FC<EmailModalProps> = ({ project, budgetEntries, onClose
   };
 
   const generateMailtoLink = (recipients: string[], subject: string, content: string) => {
-    const mailtoParams = new URLSearchParams({
-      to: recipients.join(','),
+    // mailto format: mailto:recipient1,recipient2?subject=...&body=...
+    const params = new URLSearchParams({
       subject: subject,
       body: content
     });
-    return `mailto:?${mailtoParams.toString()}`;
+    return `mailto:${recipients.join(',')}?${params.toString()}`;
   };
 
   const addManualRecipient = () => {
