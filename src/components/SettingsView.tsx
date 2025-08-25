@@ -80,6 +80,20 @@ const SettingsView = () => {
     budgetAlertThreshold: settings.budgetAlertThreshold,
     autoBackup: settings.autoBackup,
     emailNotifications: settings.emailNotifications,
+    // notificationPreferences: object of specific notification type toggles
+  notificationPreferences: (settings as any).notificationPreferences || {
+      // Project notifications
+      projectCreated: true,
+      projectUpdated: true,
+      projectCompleted: true,
+      userAssigned: true,
+      statusChanged: true,
+      // Budget notifications
+      budgetAlert: true,
+      budgetCodeAlert: true,
+      newBudgetEntry: true,
+      thresholdWarning: true
+    },
     defaultProjectStatus: settings.defaultProjectStatus,
     defaultProjectPriority: settings.defaultProjectPriority,
     maxProjectDuration: settings.maxProjectDuration,
@@ -93,6 +107,17 @@ const SettingsView = () => {
     // Note: Role-based restrictions are now handled in AppContext.updateSettings
     // This function allows all input changes for UI responsiveness
     setFormData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleNotificationToggle = (key: string, value: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      notificationPreferences: {
+        ...(prev.notificationPreferences || {}),
+        [key]: value
+      }
+    }));
     setHasChanges(true);
   };
 
@@ -595,21 +620,94 @@ const SettingsView = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
               <h5 className="font-medium text-gray-900 dark:text-white mb-2">Project Notifications</h5>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>• Project created/updated</li>
-                <li>• Project completed</li>
-                <li>• User assignments</li>
-                <li>• Status changes</li>
-              </ul>
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.projectCreated}
+                    onChange={(e) => handleNotificationToggle('projectCreated', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Project created</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.projectUpdated}
+                    onChange={(e) => handleNotificationToggle('projectUpdated', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Project updated</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.projectCompleted}
+                    onChange={(e) => handleNotificationToggle('projectCompleted', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Project completed</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.userAssigned}
+                    onChange={(e) => handleNotificationToggle('userAssigned', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>User assigned</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.statusChanged}
+                    onChange={(e) => handleNotificationToggle('statusChanged', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Status changed</span>
+                </label>
+              </div>
             </div>
             <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
               <h5 className="font-medium text-gray-900 dark:text-white mb-2">Budget Notifications</h5>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>• Budget alerts</li>
-                <li>• Budget code alerts</li>
-                <li>• New budget entries</li>
-                <li>• Threshold warnings</li>
-              </ul>
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.budgetAlert}
+                    onChange={(e) => handleNotificationToggle('budgetAlert', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Budget alerts</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.budgetCodeAlert}
+                    onChange={(e) => handleNotificationToggle('budgetCodeAlert', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Budget code alerts</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.newBudgetEntry}
+                    onChange={(e) => handleNotificationToggle('newBudgetEntry', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>New budget entry</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.notificationPreferences?.thresholdWarning}
+                    onChange={(e) => handleNotificationToggle('thresholdWarning', e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Threshold warnings</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
